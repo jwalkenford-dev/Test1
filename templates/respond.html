@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dixie Summerhouse Condo — Confirm Your Stay</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #2d3748; }
+
+    header {
+      background: #2b6cb0;
+      color: white;
+      padding: 20px 32px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header p { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+
+    .container {
+      max-width: 520px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+      padding: 28px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 18px;
+      color: #2b6cb0;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f4f8;
+      font-size: 0.9rem;
+    }
+    .detail-row:last-of-type { border-bottom: none; }
+    .detail-label { color: #718096; font-weight: 500; }
+    .detail-value { font-weight: 600; }
+
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin: 20px 0 8px;
+    }
+
+    textarea {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      height: 110px;
+      resize: vertical;
+      color: #2d3748;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.15);
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin-top: 14px;
+      border: none;
+      border-radius: 6px;
+      background: #2b6cb0;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:hover { background: #2c5282; }
+
+    .success-box {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .success-icon { font-size: 2.5rem; }
+    .success-box h2 { margin: 12px 0 6px; color: #276749; }
+    .success-box p { color: #718096; font-size: 0.88rem; }
+
+    .not-found-box { text-align: center; padding: 20px 0; color: #718096; }
+    .not-found-box h2 { color: #2d3748; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Dixie Summerhouse Condo</h1>
+  <p>Guest Confirmation</p>
+</header>
+
+<div class="container">
+  <div class="card">
+
+    {% if not_found %}
+      <div class="not-found-box">
+        <h2>Link Not Found</h2>
+        <p>This confirmation link is no longer valid. If you need help, please contact us directly.</p>
+      </div>
+
+    {% elif submitted %}
+      <div class="success-box">
+        <div class="success-icon">&#10003;</div>
+        <h2>Thanks, {{ booking.name }}!</h2>
+        <p>We've received your message and will follow up if needed. See you soon!</p>
+      </div>
+
+    {% else %}
+      <h2>Your Upcoming Stay</h2>
+      <div class="detail-row">
+        <span class="detail-label">Guest</span>
+        <span class="detail-value">{{ booking.name }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Check-in</span>
+        <span class="detail-value">{{ checkin_fmt }} (Friday)</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Checkout</span>
+        <span class="detail-value">{{ checkout_fmt }} (Friday)</span>
+      </div>
+      {% if booking.notes %}
+      <div class="detail-row">
+        <span class="detail-label">Notes</span>
+        <span class="detail-value">{{ booking.notes }}</span>
+      </div>
+      {% endif %}
+
+      <div class="section-title">Confirm or send a message</div>
+      <form method="POST">
+        <textarea name="message" placeholder="Type 'Confirmed' to confirm your stay, or ask us anything..."></textarea>
+        <button class="btn" type="submit">Send Response</button>
+      </form>
+    {% endif %}
+
+  </div>
+</div>
+
+</body>
+</html>

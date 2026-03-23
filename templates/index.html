@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dixie Summerhouse Condo — Usage Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    header {
+      position: relative;
+      color: white;
+      overflow: hidden;
+      min-height: 120px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .header-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 60%;
+    }
+
+    .header-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, rgba(27,65,120,0.82) 0%, rgba(27,65,120,0.5) 60%, rgba(0,0,0,0.2) 100%);
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 20px 32px;
+    }
+
+    header h1 { font-size: 1.5rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    header p { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+    .year-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .year-nav button {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
+    }
+
+    .year-nav button:hover { background: rgba(255,255,255,0.35); }
+    .year-nav span { font-size: 1.1rem; font-weight: 600; min-width: 50px; text-align: center; }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 24px;
+      padding: 24px 32px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    /* Calendar */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .month-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 14px;
+    }
+
+    .month-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+      text-align: center;
+      margin-bottom: 10px;
+      color: #2b6cb0;
+    }
+
+    .day-headers {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #718096;
+      margin-bottom: 4px;
+    }
+
+    .day-headers span:first-child { color: #2b6cb0; }
+
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+
+    .day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      cursor: default;
+    }
+
+    .day.friday {
+      cursor: pointer;
+      font-weight: 600;
+      color: #2b6cb0;
+      background: #ebf4ff;
+    }
+
+    .day.friday:hover { background: #bee3f8; }
+
+    .day.booked {
+      background: #fc8181 !important;
+      color: white !important;
+      font-weight: 600;
+    }
+
+    .day.checkin {
+      background: #2b6cb0 !important;
+      color: white !important;
+      border-radius: 4px 0 0 4px;
+    }
+
+    .day.checkout {
+      background: #fc8181 !important;
+      color: white !important;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .day.today {
+      outline: 2px solid #f6ad55;
+      outline-offset: -2px;
+    }
+
+    .day.empty { cursor: default; }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 18px;
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      color: #2d3748;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 10px;
+    }
+
+    .form-group { margin-bottom: 12px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 4px;
+    }
+
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.85rem;
+      color: #2d3748;
+      font-family: inherit;
+    }
+
+    .form-group input:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.15);
+    }
+
+    .form-group textarea { resize: vertical; height: 60px; }
+
+    .btn {
+      width: 100%;
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary { background: #2b6cb0; color: white; }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* Bookings list */
+    .booking-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .booking-item .guest-name {
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: #2d3748;
+      padding-right: 20px;
+    }
+
+    .booking-item .dates {
+      font-size: 0.76rem;
+      color: #718096;
+      margin-top: 2px;
+    }
+
+    .booking-item .guest-email {
+      font-size: 0.74rem;
+      color: #718096;
+      margin-top: 1px;
+    }
+
+    .booking-item .notes {
+      font-size: 0.76rem;
+      color: #4a5568;
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .booking-item .response-badge {
+      display: inline-block;
+      margin-top: 5px;
+      font-size: 0.7rem;
+      background: #c6f6d5;
+      color: #276749;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-weight: 600;
+    }
+
+    .booking-item .actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .booking-item .email-btn {
+      background: #ebf4ff;
+      border: 1px solid #bee3f8;
+      color: #2b6cb0;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .booking-item .email-btn:hover { background: #bee3f8; }
+    .booking-item .email-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .booking-item .delete-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: #fc8181;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .booking-item .delete-btn:hover { color: #e53e3e; }
+
+    .no-bookings {
+      text-align: center;
+      color: #a0aec0;
+      font-size: 0.82rem;
+      padding: 12px 0;
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: #4a5568;
+      margin-top: 8px;
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 5px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: white;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-align: center;
+      color: #4a5568;
+    }
+
+    .tab.active {
+      background: #2b6cb0;
+      color: white;
+      border-color: #2b6cb0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+      .calendar-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img class="header-img" src="https://media.scurto.net/cdn-cgi/image/width=1280/2054/media/473954-summer-house-on-romar--1522-0-20248-515.jpg.jpg" alt="Dixie Summerhouse Condo" />
+  <div class="header-overlay"></div>
+  <div class="header-content">
+    <div>
+      <h1>Dixie Summerhouse Condo</h1>
+      <p>Friday check-in · Friday checkout · 7-night stays</p>
+    </div>
+    <div class="year-nav">
+      <button id="prevYear">&#8249;</button>
+      <span id="yearLabel"></span>
+      <button id="nextYear">&#8250;</button>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div>
+    <div class="legend" style="margin-bottom:12px;">
+      <div class="legend-item"><div class="legend-dot" style="background:#2b6cb0"></div> Check-in Friday</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fc8181"></div> Booked / Checkout</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ebf4ff;border:1px solid #bee3f8"></div> Available Friday</div>
+      <div class="legend-item"><div class="legend-dot" style="outline:2px solid #f6ad55;outline-offset:-2px"></div> Today</div>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="card">
+      <h2>Add Booking</h2>
+      <div class="form-group">
+        <label>Guest Name</label>
+        <input type="text" id="guestName" placeholder="e.g. Smith Family" />
+      </div>
+      <div class="form-group">
+        <label>Check-in Friday</label>
+        <input type="date" id="checkinDate" />
+      </div>
+      <div class="form-group">
+        <label>Guest Email (optional)</label>
+        <input type="email" id="guestEmail" placeholder="guest@example.com" />
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <textarea id="notes" placeholder="Any notes..."></textarea>
+      </div>
+      <button class="btn btn-primary" id="addBtn" onclick="addBooking()">Add Booking</button>
+    </div>
+
+    <div class="card">
+      <h2>Bookings</h2>
+      <div class="filter-tabs">
+        <div class="tab active" onclick="setFilter('upcoming', this)">Upcoming</div>
+        <div class="tab" onclick="setFilter('past', this)">Past</div>
+        <div class="tab" onclick="setFilter('all', this)">All</div>
+      </div>
+      <div id="bookingsList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let currentYear = new Date().getFullYear();
+  let filter = 'upcoming';
+  let bookings = [];
+
+  // ---------------------------------------------------------------------------
+  // API helpers
+  // ---------------------------------------------------------------------------
+
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  async function loadBookings() {
+    bookings = await apiFetch('/api/bookings');
+    renderCalendar();
+    renderBookings();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+
+  function isFriday(date) { return date.getDay() === 5; }
+
+  function parseLocalDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function formatDate(str) {
+    const d = parseLocalDate(str);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function addDays(date, n) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+  }
+
+  function dateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg, duration = 3000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), duration);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calendar
+  // ---------------------------------------------------------------------------
+
+  function buildBookedMap() {
+    const map = {};
+    bookings.forEach(b => {
+      const checkin = parseLocalDate(b.checkin);
+      const checkout = addDays(checkin, 7);
+      map[dateKey(checkin)] = { type: 'checkin', id: b.id, name: b.name };
+      for (let i = 1; i < 7; i++) {
+        map[dateKey(addDays(checkin, i))] = { type: 'booked', id: b.id, name: b.name };
+      }
+      map[dateKey(checkout)] = { type: 'checkout', id: b.id, name: b.name };
+    });
+    return map;
+  }
+
+  function renderCalendar() {
+    document.getElementById('yearLabel').textContent = currentYear;
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+    const bookedMap = buildBookedMap();
+    const todayKey = dateKey(new Date());
+
+    for (let m = 0; m < 12; m++) {
+      const card = document.createElement('div');
+      card.className = 'month-card';
+
+      const title = document.createElement('div');
+      title.className = 'month-name';
+      title.textContent = MONTHS[m];
+      card.appendChild(title);
+
+      const headers = document.createElement('div');
+      headers.className = 'day-headers';
+      DAYS.forEach(d => {
+        const s = document.createElement('span');
+        s.textContent = d;
+        headers.appendChild(s);
+      });
+      card.appendChild(headers);
+
+      const daysGrid = document.createElement('div');
+      daysGrid.className = 'days-grid';
+
+      const firstDay = new Date(currentYear, m, 1).getDay();
+      const daysInMonth = new Date(currentYear, m + 1, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'day empty';
+        daysGrid.appendChild(empty);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(currentYear, m, d);
+        const key = dateKey(date);
+        const cell = document.createElement('div');
+        cell.className = 'day';
+        cell.textContent = d;
+
+        if (key === todayKey) cell.classList.add('today');
+
+        const booked = bookedMap[key];
+        if (booked) {
+          cell.classList.add(booked.type === 'checkin' ? 'checkin' : booked.type === 'checkout' ? 'checkout' : 'booked');
+          cell.title = booked.name;
+        } else if (isFriday(date)) {
+          cell.classList.add('friday');
+          cell.title = 'Click to book this Friday';
+          cell.addEventListener('click', () => prefillDate(key));
+        }
+
+        daysGrid.appendChild(cell);
+      }
+
+      card.appendChild(daysGrid);
+      grid.appendChild(card);
+    }
+  }
+
+  function prefillDate(key) {
+    document.getElementById('checkinDate').value = key;
+    document.getElementById('guestName').focus();
+  }
+
+  // ---------------------------------------------------------------------------
+  // CRUD
+  // ---------------------------------------------------------------------------
+
+  async function addBooking() {
+    const name = document.getElementById('guestName').value.trim();
+    const checkin = document.getElementById('checkinDate').value;
+    const notes = document.getElementById('notes').value.trim();
+    const email = document.getElementById('guestEmail').value.trim();
+
+    if (!name) { alert('Please enter a guest name.'); return; }
+    if (!checkin) { alert('Please select a check-in date.'); return; }
+
+    const btn = document.getElementById('addBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      const b = await apiFetch('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify({ name, checkin, notes, email }),
+      });
+      bookings.push(b);
+      bookings.sort((a, c) => a.checkin.localeCompare(c.checkin));
+      document.getElementById('guestName').value = '';
+      document.getElementById('checkinDate').value = '';
+      document.getElementById('guestEmail').value = '';
+      document.getElementById('notes').value = '';
+      renderCalendar();
+      renderBookings();
+      showToast('Booking added!');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add Booking';
+    }
+  }
+
+  async function deleteBooking(id) {
+    if (!confirm('Remove this booking?')) return;
+    try {
+      await apiFetch(`/api/bookings/${id}`, { method: 'DELETE' });
+      bookings = bookings.filter(b => b.id !== id);
+      renderCalendar();
+      renderBookings();
+      showToast('Booking removed.');
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function emailGuest(id) {
+    const b = bookings.find(b => b.id === id);
+    if (!b) return;
+    const btn = document.getElementById(`email-btn-${id}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try {
+      await apiFetch(`/api/bookings/${id}/email`, { method: 'POST' });
+      // Update local reminder_sent flag
+      b.reminder_sent = 1;
+      renderBookings();
+      showToast(`Reminder sent to ${b.email}`);
+    } catch (e) {
+      alert('Failed to send email: ' + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = '✉ Email'; }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bookings list
+  // ---------------------------------------------------------------------------
+
+  function setFilter(f, el) {
+    filter = f;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    renderBookings();
+  }
+
+  function renderBookings() {
+    const list = document.getElementById('bookingsList');
+    const today = dateKey(new Date());
+    let filtered = [...bookings];
+
+    if (filter === 'upcoming') filtered = filtered.filter(b => b.checkin >= today);
+    else if (filter === 'past') filtered = filtered.filter(b => b.checkin < today);
+
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="no-bookings">No ${filter} bookings.</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(b => {
+      const checkout = dateKey(addDays(parseLocalDate(b.checkin), 7));
+      const emailBtn = b.email
+        ? `<button id="email-btn-${b.id}" class="email-btn" onclick="emailGuest(${b.id})"
+             ${b.reminder_sent ? 'disabled title="Reminder already sent"' : ''}>
+             &#9993; ${b.reminder_sent ? 'Sent' : 'Email'}
+           </button>`
+        : '';
+      const responseBadge = b.guest_response
+        ? `<span class="response-badge">&#10003; Guest responded</span>`
+        : '';
+      return `
+        <div class="booking-item">
+          <button class="delete-btn" onclick="deleteBooking(${b.id})" title="Remove">&#215;</button>
+          <div class="guest-name">${escapeHtml(b.name)}</div>
+          <div class="dates">${formatDate(b.checkin)} &rarr; ${formatDate(checkout)}</div>
+          ${b.email ? `<div class="guest-email">${escapeHtml(b.email)}</div>` : ''}
+          ${b.notes ? `<div class="notes">${escapeHtml(b.notes)}</div>` : ''}
+          ${responseBadge}
+          ${emailBtn ? `<div class="actions">${emailBtn}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------------
+
+  document.getElementById('prevYear').addEventListener('click', () => { currentYear--; renderCalendar(); });
+  document.getElementById('nextYear').addEventListener('click', () => { currentYear++; renderCalendar(); });
+
+  loadBookings();
+</script>
+</body>
+</html>
