@@ -8,14 +8,21 @@ load_dotenv()
 
 from database import (
     add_booking,
+    add_family,
     delete_booking,
+    delete_family,
     get_all_bookings,
+    get_all_families,
+    get_booking_by_checkin,
     get_booking_by_id,
     get_booking_by_token,
+    get_family_by_id,
     get_unreminded_bookings_with_email,
     init_db,
     mark_reminder_sent,
     save_guest_response,
+    update_booking,
+    update_family,
 )
 from email_sender import send_reminder, send_response_ack
 
@@ -99,6 +106,87 @@ def remove_booking(booking_id):
     return jsonify({'ok': True})
 
 
+@app.post('/api/bookings/import')
+def import_bookings():
+    import csv
+    import io
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded.'}), 400
+
+    f = request.files['file']
+    filename = f.filename.lower()
+
+    rows = []
+    try:
+        if filename.endswith('.csv'):
+            text = f.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(text))
+            rows = list(reader)
+        elif filename.endswith(('.xlsx', '.xls')):
+            import openpyxl
+            wb = openpyxl.load_workbook(f, data_only=True)
+            ws = wb.active
+            headers = [str(c.value).strip().lower() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                rows.append({headers[i]: (str(v).strip() if v is not None else '') for i, v in enumerate(row)})
+        else:
+            return jsonify({'error': 'Unsupported file type. Upload a .csv or .xlsx file.'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Could not parse file: {e}'}), 400
+
+    created, updated, skipped = [], [], []
+
+    for i, row in enumerate(rows, start=2):
+        # Normalise column names (accept "guest name", "Guest Name", etc.)
+        norm = {k.strip().lower().replace(' ', '_'): v for k, v in row.items()}
+        name = norm.get('name') or norm.get('guest_name') or norm.get('guest') or ''
+        checkin = norm.get('checkin') or norm.get('check_in') or norm.get('check-in') or norm.get('date') or ''
+        email = norm.get('email') or norm.get('guest_email') or ''
+        notes = norm.get('notes') or norm.get('note') or ''
+
+        name = name.strip()
+        checkin = checkin.strip()
+        email = email.strip()
+        notes = notes.strip()
+
+        if not name or not checkin:
+            skipped.append({'row': i, 'reason': 'Missing name or check-in date'})
+            continue
+
+        # Normalise date formats MM/DD/YYYY or DD/MM/YYYY → YYYY-MM-DD
+        if '/' in checkin:
+            parts = checkin.split('/')
+            if len(parts) == 3:
+                try:
+                    m_part, d_part, y_part = parts
+                    checkin = f"{int(y_part):04d}-{int(m_part):02d}-{int(d_part):02d}"
+                except ValueError:
+                    skipped.append({'row': i, 'reason': f'Unrecognised date format: {checkin}'})
+                    continue
+
+        try:
+            if not is_friday(checkin):
+                skipped.append({'row': i, 'reason': f'{checkin} is not a Friday'})
+                continue
+        except ValueError:
+            skipped.append({'row': i, 'reason': f'Invalid date: {checkin}'})
+            continue
+
+        existing = get_booking_by_checkin(checkin)
+        if existing:
+            update_booking(existing['id'], name, checkin, notes, email)
+            updated.append({'id': existing['id'], 'name': name, 'checkin': checkin})
+        else:
+            if has_conflict(checkin):
+                skipped.append({'row': i, 'reason': f'Week starting {checkin} overlaps an existing booking'})
+                continue
+            b = add_booking(name, checkin, notes, email)
+            created.append({'id': b['id'], 'name': name, 'checkin': checkin})
+
+    return jsonify({'created': created, 'updated': updated, 'skipped': skipped})
+
+
 @app.post('/api/bookings/<int:booking_id>/email')
 def send_manual_email(booking_id):
     b = get_booking_by_id(booking_id)
@@ -158,6 +246,66 @@ def submit_response(token):
                 pass
 
     return redirect(url_for('respond_page', token=token, submitted=1))
+
+
+# ---------------------------------------------------------------------------
+# Families
+# ---------------------------------------------------------------------------
+
+@app.get('/families')
+def families_page():
+    return render_template('families.html')
+
+
+@app.get('/api/families')
+def list_families():
+    return jsonify(get_all_families())
+
+
+@app.post('/api/families')
+def create_family():
+    data = request.get_json(force=True)
+    family_name = (data.get('family_name') or '').strip()
+    if not family_name:
+        return jsonify({'error': 'Family name is required.'}), 400
+    f = add_family(
+        family_name,
+        (data.get('contact1_name') or '').strip(),
+        (data.get('contact1_email') or '').strip(),
+        (data.get('contact1_phone') or '').strip(),
+        (data.get('contact2_name') or '').strip(),
+        (data.get('contact2_email') or '').strip(),
+        (data.get('contact2_phone') or '').strip(),
+    )
+    return jsonify(f), 201
+
+
+@app.put('/api/families/<int:family_id>')
+def edit_family(family_id):
+    if not get_family_by_id(family_id):
+        return jsonify({'error': 'Family not found.'}), 404
+    data = request.get_json(force=True)
+    family_name = (data.get('family_name') or '').strip()
+    if not family_name:
+        return jsonify({'error': 'Family name is required.'}), 400
+    f = update_family(
+        family_id,
+        family_name,
+        (data.get('contact1_name') or '').strip(),
+        (data.get('contact1_email') or '').strip(),
+        (data.get('contact1_phone') or '').strip(),
+        (data.get('contact2_name') or '').strip(),
+        (data.get('contact2_email') or '').strip(),
+        (data.get('contact2_phone') or '').strip(),
+    )
+    return jsonify(f)
+
+
+@app.delete('/api/families/<int:family_id>')
+def remove_family(family_id):
+    if delete_family(family_id) == 0:
+        return jsonify({'error': 'Family not found.'}), 404
+    return jsonify({'ok': True})
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dixie Summerhouse Condo — Families</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    header {
+      background: #2b6cb0;
+      color: white;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 { font-size: 1.4rem; font-weight: 600; }
+    header p { font-size: 0.83rem; opacity: 0.85; margin-top: 2px; }
+
+    .back-link {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.4);
+      padding: 5px 14px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .back-link:hover { background: rgba(255,255,255,0.15); }
+
+    .main {
+      max-width: 900px;
+      margin: 28px auto;
+      padding: 0 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 22px 24px;
+      margin-bottom: 20px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 12px;
+    }
+
+    .card-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    /* Add family form */
+    .add-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+    }
+
+    .add-form .full { grid-column: 1 / -1; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 3px;
+    }
+
+    .form-group input {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 0.84rem;
+      color: #2d3748;
+      font-family: inherit;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.15);
+    }
+
+    .contact-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #a0aec0;
+      grid-column: 1 / -1;
+      margin-top: 4px;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary { background: #2b6cb0; color: white; }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    .btn-sm {
+      padding: 4px 12px;
+      font-size: 0.76rem;
+      border-radius: 5px;
+    }
+
+    .btn-ghost {
+      background: #ebf4ff;
+      border: 1px solid #bee3f8;
+      color: #2b6cb0;
+    }
+    .btn-ghost:hover { background: #bee3f8; }
+
+    .btn-danger {
+      background: none;
+      border: 1px solid #fed7d7;
+      color: #e53e3e;
+    }
+    .btn-danger:hover { background: #fff5f5; }
+
+    /* Family cards */
+    .families-list { display: flex; flex-direction: column; gap: 14px; }
+
+    .family-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .family-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f7fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .family-card-header .family-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #2b6cb0;
+    }
+
+    .family-card-header .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .family-contacts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .contact-col {
+      padding: 14px 16px;
+    }
+
+    .contact-col:first-child {
+      border-right: 1px solid #e2e8f0;
+    }
+
+    .contact-col-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #a0aec0;
+      margin-bottom: 8px;
+    }
+
+    /* View mode */
+    .contact-field {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 0.83rem;
+      margin-bottom: 5px;
+      min-height: 20px;
+    }
+
+    .contact-field .field-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #a0aec0;
+      min-width: 42px;
+    }
+
+    .contact-field .field-value {
+      color: #2d3748;
+    }
+
+    .contact-field .field-value.empty {
+      color: #cbd5e0;
+      font-style: italic;
+    }
+
+    /* Edit mode */
+    .edit-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .edit-grid .edit-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .edit-grid .edit-row label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #a0aec0;
+      min-width: 42px;
+    }
+
+    .edit-grid .edit-row input {
+      flex: 1;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 5px 8px;
+      font-size: 0.82rem;
+      font-family: inherit;
+      color: #2d3748;
+    }
+
+    .edit-grid .edit-row input:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 2px rgba(43,108,176,0.15);
+    }
+
+    .family-name-edit {
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 5px 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #2b6cb0;
+      font-family: inherit;
+      width: 220px;
+    }
+
+    .family-name-edit:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 2px rgba(43,108,176,0.15);
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 8px;
+      padding: 10px 16px;
+      border-top: 1px solid #e2e8f0;
+      background: #f7fafc;
+      justify-content: flex-end;
+    }
+
+    .no-families {
+      text-align: center;
+      color: #a0aec0;
+      font-size: 0.85rem;
+      padding: 24px 0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 600px) {
+      .add-form { grid-template-columns: 1fr; }
+      .family-contacts { grid-template-columns: 1fr; }
+      .contact-col:first-child { border-right: none; border-bottom: 1px solid #e2e8f0; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Dixie Summerhouse Condo</h1>
+    <p>Family Directory</p>
+  </div>
+  <a class="back-link" href="/">&#8592; Bookings</a>
+</header>
+
+<div class="main">
+
+  <!-- Add family -->
+  <div class="card">
+    <div class="card-header">
+      <h2>Add Family</h2>
+    </div>
+    <div class="add-form">
+      <div class="form-group full">
+        <label>Family Name *</label>
+        <input type="text" id="newFamilyName" placeholder="e.g. Smith Family" />
+      </div>
+
+      <div class="contact-section-label">Contact 1</div>
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="c1Name" placeholder="First & last name" />
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" id="c1Phone" placeholder="(555) 000-0000" />
+      </div>
+      <div class="form-group full">
+        <label>Email</label>
+        <input type="email" id="c1Email" placeholder="contact@example.com" />
+      </div>
+
+      <div class="contact-section-label">Contact 2</div>
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="c2Name" placeholder="First & last name" />
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" id="c2Phone" placeholder="(555) 000-0000" />
+      </div>
+      <div class="form-group full">
+        <label>Email</label>
+        <input type="email" id="c2Email" placeholder="contact@example.com" />
+      </div>
+
+      <div class="full" style="margin-top:4px;">
+        <button class="btn btn-primary" id="addFamilyBtn" onclick="addFamily()">Add Family</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Family list -->
+  <div class="card">
+    <div class="card-header">
+      <h2>All Families</h2>
+      <span id="familyCount" style="font-size:0.8rem;color:#718096;"></span>
+    </div>
+    <div class="families-list" id="familiesList">
+      <div class="no-families">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let families = [];
+  let editingId = null;
+
+  // ---------------------------------------------------------------------------
+  // API
+  // ---------------------------------------------------------------------------
+
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(path, {
+      headers: options.body && !(options.body instanceof FormData)
+        ? { 'Content-Type': 'application/json' }
+        : {},
+      ...options,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  async function loadFamilies() {
+    families = await apiFetch('/api/families');
+    renderFamilies();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function val(id) {
+    return (document.getElementById(id)?.value || '').trim();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add family
+  // ---------------------------------------------------------------------------
+
+  async function addFamily() {
+    const family_name = val('newFamilyName');
+    if (!family_name) { alert('Family name is required.'); return; }
+
+    const btn = document.getElementById('addFamilyBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+      const f = await apiFetch('/api/families', {
+        method: 'POST',
+        body: JSON.stringify({
+          family_name,
+          contact1_name:  val('c1Name'),
+          contact1_email: val('c1Email'),
+          contact1_phone: val('c1Phone'),
+          contact2_name:  val('c2Name'),
+          contact2_email: val('c2Email'),
+          contact2_phone: val('c2Phone'),
+        }),
+      });
+      families.push(f);
+      families.sort((a, b) => a.family_name.localeCompare(b.family_name));
+      ['newFamilyName','c1Name','c1Email','c1Phone','c2Name','c2Email','c2Phone']
+        .forEach(id => { document.getElementById(id).value = ''; });
+      renderFamilies();
+      showToast('Family added!');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Add Family';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Edit / Save / Cancel
+  // ---------------------------------------------------------------------------
+
+  function startEdit(id) {
+    editingId = id;
+    renderFamilies();
+    document.getElementById(`family-name-edit-${id}`)?.focus();
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    renderFamilies();
+  }
+
+  async function saveEdit(id) {
+    const family_name = (document.getElementById(`family-name-edit-${id}`)?.value || '').trim();
+    if (!family_name) { alert('Family name is required.'); return; }
+
+    const btn = document.getElementById(`save-btn-${id}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    const payload = {
+      family_name,
+      contact1_name:  (document.getElementById(`e-c1name-${id}`)?.value  || '').trim(),
+      contact1_email: (document.getElementById(`e-c1email-${id}`)?.value || '').trim(),
+      contact1_phone: (document.getElementById(`e-c1phone-${id}`)?.value || '').trim(),
+      contact2_name:  (document.getElementById(`e-c2name-${id}`)?.value  || '').trim(),
+      contact2_email: (document.getElementById(`e-c2email-${id}`)?.value || '').trim(),
+      contact2_phone: (document.getElementById(`e-c2phone-${id}`)?.value || '').trim(),
+    };
+
+    try {
+      const updated = await apiFetch(`/api/families/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      const idx = families.findIndex(f => f.id === id);
+      if (idx !== -1) families[idx] = updated;
+      families.sort((a, b) => a.family_name.localeCompare(b.family_name));
+      editingId = null;
+      renderFamilies();
+      showToast('Saved!');
+    } catch (e) {
+      alert(e.message);
+      if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    }
+  }
+
+  async function deleteFamily(id) {
+    const f = families.find(f => f.id === id);
+    if (!confirm(`Remove "${f?.family_name}"?`)) return;
+    try {
+      await apiFetch(`/api/families/${id}`, { method: 'DELETE' });
+      families = families.filter(f => f.id !== id);
+      if (editingId === id) editingId = null;
+      renderFamilies();
+      showToast('Family removed.');
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  function fieldView(label, value) {
+    const isEmpty = !value;
+    return `
+      <div class="contact-field">
+        <span class="field-label">${label}</span>
+        <span class="field-value${isEmpty ? ' empty' : ''}">${isEmpty ? '—' : escapeHtml(value)}</span>
+      </div>`;
+  }
+
+  function fieldEdit(label, inputId, value, type = 'text') {
+    return `
+      <div class="edit-row">
+        <label for="${inputId}">${label}</label>
+        <input id="${inputId}" type="${type}" value="${escapeHtml(value)}" />
+      </div>`;
+  }
+
+  function renderFamilyCard(f) {
+    const isEditing = editingId === f.id;
+
+    const nameHtml = isEditing
+      ? `<input class="family-name-edit" id="family-name-edit-${f.id}" value="${escapeHtml(f.family_name)}" />`
+      : `<span class="family-name">${escapeHtml(f.family_name)}</span>`;
+
+    const actionsHtml = isEditing
+      ? `<button class="btn btn-sm btn-danger" onclick="cancelEdit()">Cancel</button>`
+      : `<button class="btn btn-sm btn-ghost" onclick="startEdit(${f.id})">Edit</button>
+         <button class="btn btn-sm btn-danger" onclick="deleteFamily(${f.id})">Remove</button>`;
+
+    let contactsHtml;
+    if (isEditing) {
+      contactsHtml = `
+        <div class="family-contacts">
+          <div class="contact-col">
+            <div class="contact-col-label">Contact 1</div>
+            <div class="edit-grid">
+              ${fieldEdit('Name',  `e-c1name-${f.id}`,  f.contact1_name)}
+              ${fieldEdit('Email', `e-c1email-${f.id}`, f.contact1_email, 'email')}
+              ${fieldEdit('Phone', `e-c1phone-${f.id}`, f.contact1_phone, 'tel')}
+            </div>
+          </div>
+          <div class="contact-col">
+            <div class="contact-col-label">Contact 2</div>
+            <div class="edit-grid">
+              ${fieldEdit('Name',  `e-c2name-${f.id}`,  f.contact2_name)}
+              ${fieldEdit('Email', `e-c2email-${f.id}`, f.contact2_email, 'email')}
+              ${fieldEdit('Phone', `e-c2phone-${f.id}`, f.contact2_phone, 'tel')}
+            </div>
+          </div>
+        </div>
+        <div class="edit-actions">
+          <button class="btn btn-sm btn-danger" onclick="cancelEdit()">Cancel</button>
+          <button class="btn btn-sm btn-primary" id="save-btn-${f.id}" onclick="saveEdit(${f.id})">Save Changes</button>
+        </div>`;
+    } else {
+      contactsHtml = `
+        <div class="family-contacts">
+          <div class="contact-col">
+            <div class="contact-col-label">Contact 1</div>
+            ${fieldView('Name',  f.contact1_name)}
+            ${fieldView('Email', f.contact1_email)}
+            ${fieldView('Phone', f.contact1_phone)}
+          </div>
+          <div class="contact-col">
+            <div class="contact-col-label">Contact 2</div>
+            ${fieldView('Name',  f.contact2_name)}
+            ${fieldView('Email', f.contact2_email)}
+            ${fieldView('Phone', f.contact2_phone)}
+          </div>
+        </div>`;
+    }
+
+    return `
+      <div class="family-card" id="family-${f.id}">
+        <div class="family-card-header">
+          ${nameHtml}
+          <div class="header-actions">${isEditing ? '' : actionsHtml}</div>
+        </div>
+        ${contactsHtml}
+      </div>`;
+  }
+
+  function renderFamilies() {
+    const list = document.getElementById('familiesList');
+    const count = document.getElementById('familyCount');
+    count.textContent = families.length ? `${families.length} famil${families.length === 1 ? 'y' : 'ies'}` : '';
+
+    if (!families.length) {
+      list.innerHTML = '<div class="no-families">No families yet. Add one above.</div>';
+      return;
+    }
+    list.innerHTML = families.map(renderFamilyCard).join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------------
+
+  loadFamilies();
+</script>
+</body>
+</html>

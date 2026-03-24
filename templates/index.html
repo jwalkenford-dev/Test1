@@ -387,10 +387,13 @@
       <h1>Dixie Summerhouse Condo</h1>
       <p>Friday check-in · Friday checkout · 7-night stays</p>
     </div>
-    <div class="year-nav">
-      <button id="prevYear">&#8249;</button>
-      <span id="yearLabel"></span>
-      <button id="nextYear">&#8250;</button>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <a href="/families" style="color:rgba(255,255,255,0.85);text-decoration:none;font-size:0.83rem;font-weight:500;border:1px solid rgba(255,255,255,0.4);padding:5px 14px;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background=''">Families</a>
+      <div class="year-nav">
+        <button id="prevYear">&#8249;</button>
+        <span id="yearLabel"></span>
+        <button id="nextYear">&#8250;</button>
+      </div>
     </div>
   </div>
 </header>
@@ -426,6 +429,21 @@
         <textarea id="notes" placeholder="Any notes..."></textarea>
       </div>
       <button class="btn btn-primary" id="addBtn" onclick="addBooking()">Add Booking</button>
+    </div>
+
+    <div class="card">
+      <h2>Import from Spreadsheet</h2>
+      <p style="font-size:0.78rem;color:#718096;margin-bottom:10px;">
+        Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file with columns:
+        <em>name, checkin (YYYY-MM-DD or MM/DD/YYYY), email, notes</em>.
+        Existing bookings on the same date will be updated.
+      </p>
+      <div class="form-group">
+        <label>Choose file</label>
+        <input type="file" id="importFile" accept=".csv,.xlsx,.xls" style="padding:4px 6px;" />
+      </div>
+      <button class="btn btn-primary" id="importBtn" onclick="importSpreadsheet()">Import</button>
+      <div id="importResult" style="margin-top:10px;font-size:0.78rem;"></div>
     </div>
 
     <div class="card">
@@ -710,6 +728,54 @@
         </div>
       `;
     }).join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Spreadsheet import
+  // ---------------------------------------------------------------------------
+
+  async function importSpreadsheet() {
+    const fileInput = document.getElementById('importFile');
+    const resultDiv = document.getElementById('importResult');
+    const btn = document.getElementById('importBtn');
+
+    if (!fileInput.files.length) {
+      alert('Please choose a file first.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    btn.disabled = true;
+    btn.textContent = 'Importing…';
+    resultDiv.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/bookings/import', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+
+      const lines = [];
+      if (data.created.length) lines.push(`<span style="color:#276749">&#10003; Created ${data.created.length} booking(s)</span>`);
+      if (data.updated.length) lines.push(`<span style="color:#2b6cb0">&#8635; Updated ${data.updated.length} booking(s)</span>`);
+      if (data.skipped.length) {
+        lines.push(`<span style="color:#c05621">&#9888; Skipped ${data.skipped.length} row(s):</span>`);
+        data.skipped.forEach(s => lines.push(`&nbsp;&nbsp;Row ${s.row}: ${escapeHtml(s.reason)}`));
+      }
+      if (!data.created.length && !data.updated.length && !data.skipped.length) {
+        lines.push('No rows found in file.');
+      }
+      resultDiv.innerHTML = lines.join('<br>');
+
+      await loadBookings();
+      fileInput.value = '';
+    } catch (e) {
+      resultDiv.innerHTML = `<span style="color:#e53e3e">Error: ${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Import';
+    }
   }
 
   // ---------------------------------------------------------------------------
