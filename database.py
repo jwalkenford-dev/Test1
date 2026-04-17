@@ -22,9 +22,23 @@ def init_db():
                 email          TEXT    DEFAULT '',
                 token          TEXT    UNIQUE,
                 reminder_sent  INTEGER DEFAULT 0,
-                guest_response TEXT    DEFAULT ''
+                guest_response TEXT    DEFAULT '',
+                gcal_event_id  TEXT    DEFAULT ''
             )
         ''')
+        # Migrations
+        for migration in [
+            "ALTER TABLE bookings ADD COLUMN gcal_event_id TEXT DEFAULT ''",
+            "ALTER TABLE bookings ADD COLUMN family_id INTEGER DEFAULT NULL",
+            "ALTER TABLE bookings ADD COLUMN phone TEXT DEFAULT ''",
+            "ALTER TABLE bookings ADD COLUMN sms_reminder_sent INTEGER DEFAULT 0",
+            "ALTER TABLE bookings ADD COLUMN maid_text_sent INTEGER DEFAULT 0",
+        ]:
+            try:
+                conn.execute(migration)
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
         conn.execute('''
             CREATE TABLE IF NOT EXISTS families (
                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +60,14 @@ def row_to_dict(row):
 
 def get_all_bookings():
     with get_conn() as conn:
-        rows = conn.execute('SELECT * FROM bookings ORDER BY checkin').fetchall()
+        rows = conn.execute('''
+            SELECT b.*,
+                   f.family_name  AS linked_family_name,
+                   COALESCE(NULLIF(f.contact1_email,''), f.contact2_email, '') AS family_email
+            FROM bookings b
+            LEFT JOIN families f ON b.family_id = f.id
+            ORDER BY b.checkin
+        ''').fetchall()
     return [row_to_dict(r) for r in rows]
 
 
@@ -62,16 +83,22 @@ def get_booking_by_token(token):
     return row_to_dict(row)
 
 
-def add_booking(name, checkin, notes, email):
+def add_booking(name, checkin, notes, email, family_id=None, phone=None):
     token = str(uuid.uuid4())
     with get_conn() as conn:
         cur = conn.execute(
-            'INSERT INTO bookings (name, checkin, notes, email, token) VALUES (?, ?, ?, ?, ?)',
-            (name, checkin, notes or '', email or '', token)
+            'INSERT INTO bookings (name, checkin, notes, email, token, family_id, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            (name, checkin, notes or '', email or '', token, family_id, phone or '')
         )
         conn.commit()
         row = conn.execute('SELECT * FROM bookings WHERE id = ?', (cur.lastrowid,)).fetchone()
     return row_to_dict(row)
+
+
+def set_booking_family(booking_id, family_id):
+    with get_conn() as conn:
+        conn.execute('UPDATE bookings SET family_id = ? WHERE id = ?', (family_id, booking_id))
+        conn.commit()
 
 
 def get_booking_by_checkin(checkin):
@@ -80,11 +107,11 @@ def get_booking_by_checkin(checkin):
     return row_to_dict(row)
 
 
-def update_booking(booking_id, name, checkin, notes, email):
+def update_booking(booking_id, name, checkin, notes, email, phone=None):
     with get_conn() as conn:
         conn.execute(
-            'UPDATE bookings SET name=?, checkin=?, notes=?, email=? WHERE id=?',
-            (name, checkin, notes or '', email or '', booking_id)
+            'UPDATE bookings SET name=?, checkin=?, notes=?, email=?, phone=? WHERE id=?',
+            (name, checkin, notes or '', email or '', phone or '', booking_id)
         )
         conn.commit()
         row = conn.execute('SELECT * FROM bookings WHERE id = ?', (booking_id,)).fetchone()
@@ -100,16 +127,73 @@ def delete_booking(booking_id):
 
 def get_unreminded_bookings_with_email():
     with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM bookings WHERE reminder_sent = 0 AND email != ''"
-        ).fetchall()
+        rows = conn.execute('''
+            SELECT b.*,
+                   COALESCE(NULLIF(b.email,''),
+                            NULLIF(f.contact1_email,''),
+                            f.contact2_email, '') AS effective_email,
+                   COALESCE(NULLIF(b.phone,''),
+                            NULLIF(f.contact1_phone,''),
+                            f.contact2_phone, '') AS effective_phone
+            FROM bookings b
+            LEFT JOIN families f ON b.family_id = f.id
+            WHERE (b.reminder_sent = 0 OR b.sms_reminder_sent = 0)
+              AND (
+                COALESCE(NULLIF(b.email,''), NULLIF(f.contact1_email,''), f.contact2_email, '') != ''
+                OR
+                COALESCE(NULLIF(b.phone,''), NULLIF(f.contact1_phone,''), f.contact2_phone, '') != ''
+              )
+        ''').fetchall()
     return [row_to_dict(r) for r in rows]
+
+
+def set_gcal_event_id(booking_id, event_id):
+    with get_conn() as conn:
+        conn.execute('UPDATE bookings SET gcal_event_id = ? WHERE id = ?', (event_id or '', booking_id))
+        conn.commit()
 
 
 def mark_reminder_sent(booking_id):
     with get_conn() as conn:
         conn.execute('UPDATE bookings SET reminder_sent = 1 WHERE id = ?', (booking_id,))
         conn.commit()
+
+
+def mark_sms_sent(booking_id):
+    with get_conn() as conn:
+        conn.execute('UPDATE bookings SET sms_reminder_sent = 1 WHERE id = ?', (booking_id,))
+        conn.commit()
+
+
+def mark_maid_text_sent(booking_id):
+    with get_conn() as conn:
+        conn.execute('UPDATE bookings SET maid_text_sent = 1 WHERE id = ?', (booking_id,))
+        conn.commit()
+
+
+def get_active_booking_for_date(date_str):
+    """Return the booking whose week covers the given date (checkin <= date < checkin+7)."""
+    with get_conn() as conn:
+        rows = conn.execute('''
+            SELECT b.*,
+                   COALESCE(NULLIF(b.phone,''),
+                            NULLIF(f.contact1_phone,''),
+                            f.contact2_phone, '') AS effective_phone
+            FROM bookings b
+            LEFT JOIN families f ON b.family_id = f.id
+            WHERE b.maid_text_sent = 0
+        ''').fetchall()
+    for row in rows:
+        d = row_to_dict(row)
+        checkin = d['checkin']
+        # Build the 7-day window for this booking
+        from datetime import datetime, timedelta
+        start = datetime.strptime(checkin, '%Y-%m-%d').date()
+        end = start + timedelta(days=7)
+        target = datetime.strptime(date_str, '%Y-%m-%d').date()
+        if start <= target < end:
+            return d
+    return None
 
 
 # ---------------------------------------------------------------------------

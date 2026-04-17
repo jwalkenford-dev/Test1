@@ -400,6 +400,7 @@
 
 <div class="main">
   <div>
+    <div id="upcomingBanner" style="display:none;margin-bottom:14px;"></div>
     <div class="legend" style="margin-bottom:12px;">
       <div class="legend-item"><div class="legend-dot" style="background:#2b6cb0"></div> Check-in Friday</div>
       <div class="legend-item"><div class="legend-dot" style="background:#fc8181"></div> Booked / Checkout</div>
@@ -411,7 +412,13 @@
 
   <div class="sidebar">
     <div class="card">
-      <h2>Add Booking</h2>
+      <h2>Modify Booking</h2>
+      <div class="form-group">
+        <label>Family (optional)</label>
+        <select id="familyPicker" onchange="fillFromFamily()" style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;font-size:0.85rem;color:#2d3748;font-family:inherit;">
+          <option value="">— select a family —</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>Guest Name</label>
         <input type="text" id="guestName" placeholder="e.g. Smith Family" />
@@ -432,6 +439,39 @@
     </div>
 
     <div class="card">
+      <h2>Checkout Details</h2>
+      <ul style="list-style:none;padding:0;margin:0;font-size:0.84rem;color:#4a5568;">
+        <li style="padding:7px 0;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:8px;">
+          <span style="color:#2b6cb0;font-size:1rem;line-height:1.4;">&#10003;</span> Contact Maid
+        </li>
+        <li style="padding:7px 0;border-bottom:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:8px;">
+          <span style="color:#2b6cb0;font-size:1rem;line-height:1.4;">&#10003;</span> Ensure sheets and towels are clean and in dryer
+        </li>
+        <li style="padding:7px 0;display:flex;align-items:flex-start;gap:8px;">
+          <span style="color:#2b6cb0;font-size:1rem;line-height:1.4;">&#10003;</span> Validate soap, dishwashing detergent, and laundry detergent are available for at least 2 days use
+        </li>
+      </ul>
+    </div>
+
+    <div class="card" id="gcalCard">
+      <h2>Google Calendar</h2>
+      <div id="gcalStatus" style="font-size:0.82rem;color:#718096;margin-bottom:10px;">Checking…</div>
+      <button class="btn btn-primary" id="gcalConnectBtn" style="display:none" onclick="window.location='/gcal/connect'">Connect Google Calendar</button>
+      <button class="btn btn-primary" id="gcalSyncBtn" style="display:none" onclick="gcalSyncAll()">Sync All to Google Calendar</button>
+      <div id="gcalSyncResult" style="margin-top:8px;font-size:0.78rem;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Bookings</h2>
+      <div class="filter-tabs">
+        <div class="tab active" onclick="setFilter('upcoming', this)">Upcoming</div>
+        <div class="tab" onclick="setFilter('past', this)">Past</div>
+        <div class="tab" onclick="setFilter('all', this)">All</div>
+      </div>
+      <div id="bookingsList"></div>
+    </div>
+
+    <div class="card">
       <h2>Import from Spreadsheet</h2>
       <p style="font-size:0.78rem;color:#718096;margin-bottom:10px;">
         Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file with columns:
@@ -445,16 +485,6 @@
       <button class="btn btn-primary" id="importBtn" onclick="importSpreadsheet()">Import</button>
       <div id="importResult" style="margin-top:10px;font-size:0.78rem;"></div>
     </div>
-
-    <div class="card">
-      <h2>Bookings</h2>
-      <div class="filter-tabs">
-        <div class="tab active" onclick="setFilter('upcoming', this)">Upcoming</div>
-        <div class="tab" onclick="setFilter('past', this)">Past</div>
-        <div class="tab" onclick="setFilter('all', this)">All</div>
-      </div>
-      <div id="bookingsList"></div>
-    </div>
   </div>
 </div>
 
@@ -465,8 +495,10 @@
   const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
   let currentYear = new Date().getFullYear();
+  let currentMonth = new Date().getMonth();
   let filter = 'upcoming';
   let bookings = [];
+  let families = [];
 
   // ---------------------------------------------------------------------------
   // API helpers
@@ -486,6 +518,28 @@
     bookings = await apiFetch('/api/bookings');
     renderCalendar();
     renderBookings();
+  }
+
+  async function loadFamilies() {
+    families = await apiFetch('/api/families');
+    const picker = document.getElementById('familyPicker');
+    picker.innerHTML = '<option value="">— select a family —</option>';
+    families.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.family_name;
+      picker.appendChild(opt);
+    });
+  }
+
+  function fillFromFamily() {
+    const id = parseInt(document.getElementById('familyPicker').value, 10);
+    if (!id) return;
+    const f = families.find(f => f.id === id);
+    if (!f) return;
+    document.getElementById('guestName').value = f.family_name;
+    // Prefer contact1 email, fall back to contact2
+    document.getElementById('guestEmail').value = f.contact1_email || f.contact2_email || '';
   }
 
   // ---------------------------------------------------------------------------
@@ -543,20 +597,55 @@
     return map;
   }
 
+  function renderUpcomingBanner() {
+    const banner = document.getElementById('upcomingBanner');
+    const today = dateKey(new Date());
+    const next2 = bookings.filter(b => b.checkin >= today).slice(0, 2);
+    if (!next2.length) { banner.style.display = 'none'; return; }
+
+    banner.style.display = 'flex';
+    banner.style.gap = '12px';
+    banner.style.flexWrap = 'wrap';
+    banner.innerHTML = next2.map((b, i) => {
+      const checkout = dateKey(addDays(parseLocalDate(b.checkin), 7));
+      const label = i === 0 ? 'This Week' : 'Next Week';
+      const isActive = b.checkin <= today && today < checkout;
+      const labelColor = isActive ? '#276749' : '#2b6cb0';
+      const labelBg = isActive ? '#c6f6d5' : '#ebf4ff';
+      return `
+        <div style="flex:1;min-width:200px;background:white;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08);padding:12px 16px;display:flex;align-items:center;gap:12px;">
+          <div style="width:4px;align-self:stretch;background:${labelColor};border-radius:4px;flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:0.7rem;font-weight:700;color:${labelColor};background:${labelBg};display:inline-block;padding:2px 8px;border-radius:4px;margin-bottom:4px;">${label}</div>
+            <div style="font-weight:700;font-size:1rem;color:#2d3748;">${escapeHtml(b.name)}</div>
+            <div style="font-size:0.78rem;color:#718096;margin-top:1px;">${formatDate(b.checkin)} &rarr; ${formatDate(checkout)}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
   function renderCalendar() {
-    document.getElementById('yearLabel').textContent = currentYear;
+    renderUpcomingBanner();
+    const endDate = new Date(currentYear, currentMonth + 5, 1);
+    const startLabel = `${MONTHS[currentMonth]} ${currentYear}`;
+    const endLabel = `${MONTHS[endDate.getMonth()]} ${endDate.getFullYear()}`;
+    document.getElementById('yearLabel').textContent = `${startLabel} – ${endLabel}`;
+
     const grid = document.getElementById('calendarGrid');
     grid.innerHTML = '';
     const bookedMap = buildBookedMap();
     const todayKey = dateKey(new Date());
 
-    for (let m = 0; m < 12; m++) {
+    for (let i = 0; i < 6; i++) {
+      const year = currentYear + Math.floor((currentMonth + i) / 12);
+      const month = (currentMonth + i) % 12;
+
       const card = document.createElement('div');
       card.className = 'month-card';
 
       const title = document.createElement('div');
       title.className = 'month-name';
-      title.textContent = MONTHS[m];
+      title.textContent = `${MONTHS[month]} ${year !== currentYear ? year : ''}`.trim();
       card.appendChild(title);
 
       const headers = document.createElement('div');
@@ -571,17 +660,17 @@
       const daysGrid = document.createElement('div');
       daysGrid.className = 'days-grid';
 
-      const firstDay = new Date(currentYear, m, 1).getDay();
-      const daysInMonth = new Date(currentYear, m + 1, 0).getDate();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-      for (let i = 0; i < firstDay; i++) {
+      for (let j = 0; j < firstDay; j++) {
         const empty = document.createElement('div');
         empty.className = 'day empty';
         daysGrid.appendChild(empty);
       }
 
       for (let d = 1; d <= daysInMonth; d++) {
-        const date = new Date(currentYear, m, d);
+        const date = new Date(year, month, d);
         const key = dateKey(date);
         const cell = document.createElement('div');
         cell.className = 'day';
@@ -630,12 +719,14 @@
     btn.textContent = 'Saving…';
 
     try {
+      const familyId = parseInt(document.getElementById('familyPicker').value, 10) || null;
       const b = await apiFetch('/api/bookings', {
         method: 'POST',
-        body: JSON.stringify({ name, checkin, notes, email }),
+        body: JSON.stringify({ name, checkin, notes, email, family_id: familyId }),
       });
       bookings.push(b);
       bookings.sort((a, c) => a.checkin.localeCompare(c.checkin));
+      document.getElementById('familyPicker').value = '';
       document.getElementById('guestName').value = '';
       document.getElementById('checkinDate').value = '';
       document.getElementById('guestEmail').value = '';
@@ -670,14 +761,34 @@
     const btn = document.getElementById(`email-btn-${id}`);
     if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
     try {
-      await apiFetch(`/api/bookings/${id}/email`, { method: 'POST' });
-      // Update local reminder_sent flag
+      const res = await apiFetch(`/api/bookings/${id}/email`, { method: 'POST' });
       b.reminder_sent = 1;
       renderBookings();
-      showToast(`Reminder sent to ${b.email}`);
+      showToast(`Reminder sent to ${res.email || b.email || b.family_email}`);
     } catch (e) {
       alert('Failed to send email: ' + e.message);
       if (btn) { btn.disabled = false; btn.textContent = '✉ Email'; }
+    }
+  }
+
+  async function linkFamily(bookingId, selectEl) {
+    const familyId = selectEl.value ? parseInt(selectEl.value, 10) : null;
+    try {
+      await apiFetch(`/api/bookings/${bookingId}/family`, {
+        method: 'PUT',
+        body: JSON.stringify({ family_id: familyId }),
+      });
+      const b = bookings.find(b => b.id === bookingId);
+      if (b) {
+        b.family_id = familyId;
+        const f = families.find(f => f.id === familyId);
+        b.family_email = f ? (f.contact1_email || f.contact2_email || '') : '';
+        b.linked_family_name = f ? f.family_name : '';
+      }
+      renderBookings();
+      showToast(familyId ? `Linked to ${selectEl.options[selectEl.selectedIndex].text}` : 'Family unlinked');
+    } catch (e) {
+      alert('Failed to link family: ' + e.message);
     }
   }
 
@@ -707,24 +818,37 @@
 
     list.innerHTML = filtered.map(b => {
       const checkout = dateKey(addDays(parseLocalDate(b.checkin), 7));
-      const emailBtn = b.email
-        ? `<button id="email-btn-${b.id}" class="email-btn" onclick="emailGuest(${b.id})"
-             ${b.reminder_sent ? 'disabled title="Reminder already sent"' : ''}>
-             &#9993; ${b.reminder_sent ? 'Sent' : 'Email'}
-           </button>`
-        : '';
+      const effectiveEmail = b.email || b.family_email || '';
+      const emailBtn = `<button id="email-btn-${b.id}" class="email-btn" onclick="emailGuest(${b.id})"
+           ${!effectiveEmail || b.reminder_sent ? 'disabled' : ''}
+           title="${!effectiveEmail ? 'No email — link a family first' : b.reminder_sent ? 'Reminder already sent' : 'Send reminder email'}">
+           &#9993; ${b.reminder_sent ? 'Sent' : 'Email'}
+         </button>`;
       const responseBadge = b.guest_response
         ? `<span class="response-badge">&#10003; Guest responded</span>`
+        : '';
+      const familyOptions = families.map(f =>
+        `<option value="${f.id}" ${b.family_id == f.id ? 'selected' : ''}>${escapeHtml(f.family_name)}</option>`
+      ).join('');
+      const displayEmail = effectiveEmail
+        ? `<div class="guest-email">${escapeHtml(effectiveEmail)}${b.family_email && !b.email ? ' <span style="color:#a0aec0;font-size:0.7rem;">(family)</span>' : ''}</div>`
         : '';
       return `
         <div class="booking-item">
           <button class="delete-btn" onclick="deleteBooking(${b.id})" title="Remove">&#215;</button>
           <div class="guest-name">${escapeHtml(b.name)}</div>
           <div class="dates">${formatDate(b.checkin)} &rarr; ${formatDate(checkout)}</div>
-          ${b.email ? `<div class="guest-email">${escapeHtml(b.email)}</div>` : ''}
+          ${displayEmail}
           ${b.notes ? `<div class="notes">${escapeHtml(b.notes)}</div>` : ''}
           ${responseBadge}
-          ${emailBtn ? `<div class="actions">${emailBtn}</div>` : ''}
+          <div class="actions" style="margin-top:8px;gap:6px;display:flex;align-items:center;flex-wrap:wrap;">
+            ${emailBtn}
+            <select style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:5px;padding:4px 6px;font-size:0.75rem;color:#4a5568;font-family:inherit;"
+              onchange="linkFamily(${b.id}, this)">
+              <option value="">Link family…</option>
+              ${familyOptions}
+            </select>
+          </div>
         </div>
       `;
     }).join('');
@@ -779,13 +903,76 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Google Calendar
+  // ---------------------------------------------------------------------------
+
+  async function loadGcalStatus() {
+    try {
+      const data = await apiFetch('/api/gcal/status');
+      const statusEl = document.getElementById('gcalStatus');
+      const connectBtn = document.getElementById('gcalConnectBtn');
+      const syncBtn = document.getElementById('gcalSyncBtn');
+
+      if (!data.configured) {
+        statusEl.innerHTML = '<span style="color:#c05621;">Not configured — add <strong>credentials.json</strong> to the app folder.</span>';
+        connectBtn.style.display = 'none';
+        syncBtn.style.display = 'none';
+      } else if (!data.authenticated) {
+        statusEl.innerHTML = '<span style="color:#c05621;">Not connected</span>';
+        connectBtn.style.display = 'block';
+        syncBtn.style.display = 'none';
+      } else {
+        statusEl.innerHTML = '<span style="color:#276749;">&#10003; Connected</span> — new bookings sync automatically.';
+        connectBtn.style.display = 'none';
+        syncBtn.style.display = 'block';
+      }
+    } catch (e) {
+      document.getElementById('gcalStatus').textContent = 'Could not load status.';
+    }
+  }
+
+  async function gcalSyncAll() {
+    const btn = document.getElementById('gcalSyncBtn');
+    const resultEl = document.getElementById('gcalSyncResult');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    resultEl.innerHTML = '';
+    try {
+      const data = await apiFetch('/api/gcal/sync', { method: 'POST' });
+      resultEl.innerHTML = `<span style="color:#276749;">&#10003; Synced ${data.synced} booking(s)</span>` +
+        (data.failed ? `<br><span style="color:#c05621;">&#9888; ${data.failed} failed</span>` : '');
+    } catch (e) {
+      resultEl.innerHTML = `<span style="color:#e53e3e;">Error: ${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sync All to Google Calendar';
+    }
+  }
+
+  // Show toast if redirected back after connecting
+  if (new URLSearchParams(location.search).get('gcal') === 'connected') {
+    history.replaceState({}, '', '/');
+    showToast('Google Calendar connected!');
+  }
+
+  // ---------------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------------
 
-  document.getElementById('prevYear').addEventListener('click', () => { currentYear--; renderCalendar(); });
-  document.getElementById('nextYear').addEventListener('click', () => { currentYear++; renderCalendar(); });
+  document.getElementById('prevYear').addEventListener('click', () => {
+    currentMonth -= 6;
+    if (currentMonth < 0) { currentMonth += 12; currentYear--; }
+    renderCalendar();
+  });
+  document.getElementById('nextYear').addEventListener('click', () => {
+    currentMonth += 6;
+    if (currentMonth > 11) { currentMonth -= 12; currentYear++; }
+    renderCalendar();
+  });
 
   loadBookings();
+  loadFamilies();
+  loadGcalStatus();
 </script>
 </body>
 </html>

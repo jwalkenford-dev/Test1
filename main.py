@@ -11,6 +11,7 @@ from database import (
     add_family,
     delete_booking,
     delete_family,
+    get_active_booking_for_date,
     get_all_bookings,
     get_all_families,
     get_booking_by_checkin,
@@ -19,12 +20,18 @@ from database import (
     get_family_by_id,
     get_unreminded_bookings_with_email,
     init_db,
+    mark_maid_text_sent,
     mark_reminder_sent,
+    mark_sms_sent,
     save_guest_response,
+    set_booking_family,
+    set_gcal_event_id,
     update_booking,
     update_family,
 )
+import gcal
 from email_sender import send_reminder, send_response_ack
+import sms_sender
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
@@ -45,9 +52,9 @@ def date_key(d):
 
 
 def booking_days(checkin_str):
-    """Return set of date strings covered by a booking (checkin through checkout)."""
+    """Return set of date strings covered by a booking (nights only, checkout day excluded)."""
     start = parse_date(checkin_str)
-    return {date_key(start + timedelta(days=i)) for i in range(8)}
+    return {date_key(start + timedelta(days=i)) for i in range(7)}
 
 
 def has_conflict(checkin_str, exclude_id=None):
@@ -85,6 +92,8 @@ def create_booking():
     checkin = (data.get('checkin') or '').strip()
     notes = (data.get('notes') or '').strip()
     email = (data.get('email') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    family_id = data.get('family_id') or None
 
     if not name:
         return jsonify({'error': 'Guest name is required.'}), 400
@@ -95,14 +104,33 @@ def create_booking():
     if has_conflict(checkin):
         return jsonify({'error': 'Week overlaps an existing booking.'}), 409
 
-    booking = add_booking(name, checkin, notes, email)
+    booking = add_booking(name, checkin, notes, email, family_id, phone)
+    event_id = gcal.create_event(name, checkin, notes)
+    if event_id:
+        set_gcal_event_id(booking['id'], event_id)
+        booking['gcal_event_id'] = event_id
     return jsonify(booking), 201
 
 
 @app.delete('/api/bookings/<int:booking_id>')
 def remove_booking(booking_id):
+    b = get_booking_by_id(booking_id)
+    if not b:
+        return jsonify({'error': 'Booking not found.'}), 404
+    if b.get('gcal_event_id'):
+        gcal.delete_event(b['gcal_event_id'])
     if delete_booking(booking_id) == 0:
         return jsonify({'error': 'Booking not found.'}), 404
+    return jsonify({'ok': True})
+
+
+@app.put('/api/bookings/<int:booking_id>/family')
+def link_family(booking_id):
+    if not get_booking_by_id(booking_id):
+        return jsonify({'error': 'Booking not found.'}), 404
+    data = request.get_json(force=True)
+    family_id = data.get('family_id') or None
+    set_booking_family(booking_id, family_id)
     return jsonify({'ok': True})
 
 
@@ -127,9 +155,46 @@ def import_bookings():
             import openpyxl
             wb = openpyxl.load_workbook(f, data_only=True)
             ws = wb.active
-            headers = [str(c.value).strip().lower() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                rows.append({headers[i]: (str(v).strip() if v is not None else '') for i, v in enumerate(row)})
+            all_rows = list(ws.iter_rows(min_row=1, values_only=True))
+
+            # Find the header row: first row that contains "name" in any column
+            header_row_idx = 0
+            for i, row in enumerate(all_rows[:6]):
+                if any(str(v).strip().lower() == 'name' for v in row if v is not None):
+                    header_row_idx = i
+                    break
+
+            header_row = all_rows[header_row_idx]
+            first_data = all_rows[header_row_idx + 1] if header_row_idx + 1 < len(all_rows) else []
+
+            # Build headers; unnamed date columns become 'checkin' then 'checkout'
+            headers = []
+            date_cols_seen = 0
+            for j, val in enumerate(header_row):
+                h = str(val).strip().lower() if val else ''
+                if not h:
+                    data_val = first_data[j] if j < len(first_data) else None
+                    if isinstance(data_val, datetime):
+                        h = 'checkin' if date_cols_seen == 0 else 'checkout'
+                        date_cols_seen += 1
+                    else:
+                        h = f'_col{j}'
+                headers.append(h)
+
+            for row in all_rows[header_row_idx + 1:]:
+                if not any(v for v in row if v is not None):
+                    continue  # skip empty rows
+                row_dict = {}
+                for j, val in enumerate(row):
+                    if j >= len(headers):
+                        continue
+                    if isinstance(val, datetime):
+                        row_dict[headers[j]] = val.strftime('%Y-%m-%d')
+                    elif val is not None:
+                        row_dict[headers[j]] = str(val).strip()
+                    else:
+                        row_dict[headers[j]] = ''
+                rows.append(row_dict)
         else:
             return jsonify({'error': 'Unsupported file type. Upload a .csv or .xlsx file.'}), 400
     except Exception as e:
@@ -141,9 +206,9 @@ def import_bookings():
         # Normalise column names (accept "guest name", "Guest Name", etc.)
         norm = {k.strip().lower().replace(' ', '_'): v for k, v in row.items()}
         name = norm.get('name') or norm.get('guest_name') or norm.get('guest') or ''
-        checkin = norm.get('checkin') or norm.get('check_in') or norm.get('check-in') or norm.get('date') or ''
+        checkin = norm.get('checkin') or norm.get('check_in') or norm.get('check-in') or norm.get('start_date') or norm.get('start') or norm.get('date') or ''
         email = norm.get('email') or norm.get('guest_email') or ''
-        notes = norm.get('notes') or norm.get('note') or ''
+        notes = norm.get('notes') or norm.get('note') or norm.get('event_date') or norm.get('event date') or ''
 
         name = name.strip()
         checkin = checkin.strip()
@@ -154,7 +219,17 @@ def import_bookings():
             skipped.append({'row': i, 'reason': 'Missing name or check-in date'})
             continue
 
-        # Normalise date formats MM/DD/YYYY or DD/MM/YYYY → YYYY-MM-DD
+        # Normalise date formats
+        # DD-Mon-YY → YYYY-MM-DD (e.g. "6-Feb-26")
+        if '-' in checkin and not checkin[0:4].isdigit():
+            for fmt in ('%d-%b-%y', '%d-%b-%Y'):
+                try:
+                    checkin = datetime.strptime(checkin, fmt).strftime('%Y-%m-%d')
+                    break
+                except ValueError:
+                    pass
+
+        # MM/DD/YYYY → YYYY-MM-DD
         if '/' in checkin:
             parts = checkin.split('/')
             if len(parts) == 3:
@@ -176,12 +251,21 @@ def import_bookings():
         existing = get_booking_by_checkin(checkin)
         if existing:
             update_booking(existing['id'], name, checkin, notes, email)
+            if existing.get('gcal_event_id'):
+                gcal.update_event(existing['gcal_event_id'], name, checkin, notes)
+            else:
+                event_id = gcal.create_event(name, checkin, notes)
+                if event_id:
+                    set_gcal_event_id(existing['id'], event_id)
             updated.append({'id': existing['id'], 'name': name, 'checkin': checkin})
         else:
             if has_conflict(checkin):
                 skipped.append({'row': i, 'reason': f'Week starting {checkin} overlaps an existing booking'})
                 continue
             b = add_booking(name, checkin, notes, email)
+            event_id = gcal.create_event(name, checkin, notes)
+            if event_id:
+                set_gcal_event_id(b['id'], event_id)
             created.append({'id': b['id'], 'name': name, 'checkin': checkin})
 
     return jsonify({'created': created, 'updated': updated, 'skipped': skipped})
@@ -192,7 +276,14 @@ def send_manual_email(booking_id):
     b = get_booking_by_id(booking_id)
     if not b:
         return jsonify({'error': 'Booking not found.'}), 404
-    if not b['email']:
+    # Use booking email, or fall back to linked family email
+    from database import get_family_by_id
+    effective_email = b['email']
+    if not effective_email and b.get('family_id'):
+        fam = get_family_by_id(b['family_id'])
+        if fam:
+            effective_email = fam.get('contact1_email') or fam.get('contact2_email') or ''
+    if not effective_email:
         return jsonify({'error': 'No email address on this booking.'}), 400
 
     checkin = parse_date(b['checkin'])
@@ -201,13 +292,45 @@ def send_manual_email(booking_id):
 
     try:
         send_reminder(
-            b['email'], b['name'],
+            effective_email, b['name'],
             checkin.strftime('%B %d, %Y'),
             checkout.strftime('%B %d, %Y'),
             respond_url,
         )
         mark_reminder_sent(b['id'])
-        return jsonify({'ok': True})
+        return jsonify({'ok': True, 'email': effective_email})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.post('/api/bookings/<int:booking_id>/sms')
+def send_manual_sms(booking_id):
+    if not sms_sender.is_configured():
+        return jsonify({'error': 'Twilio credentials not configured.'}), 503
+    b = get_booking_by_id(booking_id)
+    if not b:
+        return jsonify({'error': 'Booking not found.'}), 404
+    effective_phone = b.get('phone') or ''
+    if not effective_phone and b.get('family_id'):
+        fam = get_family_by_id(b['family_id'])
+        if fam:
+            effective_phone = fam.get('contact1_phone') or fam.get('contact2_phone') or ''
+    if not effective_phone:
+        return jsonify({'error': 'No phone number on this booking.'}), 400
+
+    checkin = parse_date(b['checkin'])
+    checkout = checkin + timedelta(days=7)
+    respond_url = f"{BASE_URL}/respond/{b['token']}"
+
+    try:
+        sms_sender.send_reminder_sms(
+            effective_phone, b['name'],
+            checkin.strftime('%B %d, %Y'),
+            checkout.strftime('%B %d, %Y'),
+            respond_url,
+        )
+        mark_sms_sent(b['id'])
+        return jsonify({'ok': True, 'phone': effective_phone})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -309,6 +432,60 @@ def remove_family(family_id):
 
 
 # ---------------------------------------------------------------------------
+# Google Calendar
+# ---------------------------------------------------------------------------
+
+@app.get('/gcal/connect')
+def gcal_connect():
+    from flask import session
+    redirect_uri = f"{BASE_URL}/gcal/callback"
+    result = gcal.get_auth_url(redirect_uri)
+    if not result:
+        return ('credentials.json not found. Download OAuth credentials from Google Cloud Console '
+                'and save as credentials.json in the app directory.'), 400
+    auth_url, state = result
+    session['gcal_state'] = state
+    return redirect(auth_url)
+
+
+@app.get('/gcal/callback')
+def gcal_callback():
+    from flask import session
+    state = session.get('gcal_state')
+    code = request.args.get('code')
+    redirect_uri = f"{BASE_URL}/gcal/callback"
+    try:
+        gcal.exchange_code(code, state, redirect_uri)
+    except Exception as e:
+        return f'Google Calendar auth failed: {e}', 400
+    return redirect('/?gcal=connected')
+
+
+@app.get('/api/gcal/status')
+def gcal_status():
+    return jsonify({
+        'configured': gcal.is_configured(),
+        'authenticated': gcal.get_service() is not None,
+    })
+
+
+@app.post('/api/gcal/sync')
+def gcal_sync_all():
+    if not gcal.get_service():
+        return jsonify({'error': 'Google Calendar not connected.'}), 400
+    synced, failed = [], []
+    for b in get_all_bookings():
+        if not b.get('gcal_event_id'):
+            event_id = gcal.create_event(b['name'], b['checkin'], b.get('notes', ''))
+            if event_id:
+                set_gcal_event_id(b['id'], event_id)
+                synced.append(b['id'])
+            else:
+                failed.append(b['id'])
+    return jsonify({'synced': len(synced), 'failed': len(failed)})
+
+
+# ---------------------------------------------------------------------------
 # Scheduler
 # ---------------------------------------------------------------------------
 
@@ -318,24 +495,71 @@ def check_and_send_reminders():
     for b in get_unreminded_bookings_with_email():
         try:
             checkin = parse_date(b['checkin'])
-            if checkin == target:
-                checkout = checkin + timedelta(days=7)
-                respond_url = f"{BASE_URL}/respond/{b['token']}"
-                send_reminder(
-                    b['email'], b['name'],
-                    checkin.strftime('%B %d, %Y'),
-                    checkout.strftime('%B %d, %Y'),
-                    respond_url,
-                )
-                mark_reminder_sent(b['id'])
+            if checkin != target:
+                continue
+            checkout = checkin + timedelta(days=7)
+            respond_url = f"{BASE_URL}/respond/{b['token']}"
+            checkin_fmt = checkin.strftime('%B %d, %Y')
+            checkout_fmt = checkout.strftime('%B %d, %Y')
+
+            if b.get('effective_email') and not b.get('reminder_sent'):
+                try:
+                    send_reminder(b['effective_email'], b['name'], checkin_fmt, checkout_fmt, respond_url)
+                    mark_reminder_sent(b['id'])
+                except Exception as e:
+                    print(f"[reminder] Email failed for booking {b['id']}: {e}")
+
+            if b.get('effective_phone') and not b.get('sms_reminder_sent') and sms_sender.is_configured():
+                try:
+                    sms_sender.send_reminder_sms(b['effective_phone'], b['name'], checkin_fmt, checkout_fmt, respond_url)
+                    mark_sms_sent(b['id'])
+                except Exception as e:
+                    print(f"[reminder] SMS failed for booking {b['id']}: {e}")
+
         except Exception as e:
             print(f"[reminder] Failed for booking {b['id']}: {e}")
+
+
+MAID_NAME = 'Mandy Giles'
+MAID_PHONE = '251-243-8068'
+
+
+def check_and_send_sunday_maid_text():
+    today = datetime.today().date()
+    b = get_active_booking_for_date(today.strftime('%Y-%m-%d'))
+    if not b:
+        return
+    phone = b.get('effective_phone', '')
+    if not phone:
+        print(f"[maid-text] No phone for booking {b['id']} — skipping")
+        return
+    if not sms_sender.is_configured():
+        print("[maid-text] Twilio not configured — skipping")
+        return
+    checkout = parse_date(b['checkin']) + timedelta(days=7)
+    checkout_fmt = checkout.strftime('%A, %B %d')
+    body = (
+        f"Hi {b['name']}, a few reminders for checkout:\n\n"
+        f"1. Contact Maid - Mandy {MAID_PHONE} by Monday prior to checkout to let her know what day and time you'll be departing.\n\n"
+        f"2. Ensure sheets and towels are clean and there is no more than 1 load in the washing machine.\n\n"
+        f"3. Ensure there is enough soap, dishwashing detergent, and laundry detergent for at least 2 days use.\n\n"
+        f"Thanks and enjoy your stay!"
+    )
+    try:
+        from twilio.rest import Client
+        client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
+        client.messages.create(body=body, from_=os.getenv('TWILIO_FROM_NUMBER'), to=phone)
+        mark_maid_text_sent(b['id'])
+        print(f"[maid-text] Sent to {b['name']} at {phone}")
+    except Exception as e:
+        print(f"[maid-text] Failed for booking {b['id']}: {e}")
 
 
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
     scheduler.add_job(check_and_send_reminders, 'cron', hour=8, minute=0)
+    scheduler.add_job(check_and_send_sunday_maid_text, 'cron', day_of_week='sun', hour=8, minute=0)
     scheduler.start()
 
 
