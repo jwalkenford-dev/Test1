@@ -306,6 +306,18 @@
 
     .booking-item .delete-btn:hover { color: #e53e3e; }
 
+    .booking-item.highlighted {
+      border-color: #f6ad55;
+      box-shadow: 0 0 0 3px rgba(246,173,85,0.4);
+      animation: highlightFade 2.5s ease forwards;
+    }
+
+    @keyframes highlightFade {
+      0%   { border-color: #f6ad55; box-shadow: 0 0 0 3px rgba(246,173,85,0.5); background: #fffbeb; }
+      60%  { border-color: #f6ad55; box-shadow: 0 0 0 3px rgba(246,173,85,0.3); background: #fffbeb; }
+      100% { border-color: #e2e8f0; box-shadow: none; background: white; }
+    }
+
     .no-bookings {
       text-align: center;
       color: #a0aec0;
@@ -704,6 +716,8 @@
         if (booked) {
           cell.classList.add(booked.type === 'checkin' ? 'checkin' : booked.type === 'checkout' ? 'checkout' : 'booked');
           cell.title = booked.name;
+          cell.style.cursor = 'pointer';
+          cell.addEventListener('click', () => highlightBooking(booked.id));
         } else if (isFriday(date)) {
           cell.classList.add('friday');
           cell.title = 'Click to book this Friday';
@@ -721,6 +735,28 @@
   function prefillDate(key) {
     document.getElementById('checkinDate').value = key;
     document.getElementById('guestName').focus();
+  }
+
+  function highlightBooking(id) {
+    // Switch to upcoming or all tab so the booking is visible
+    const b = bookings.find(b => b.id === id);
+    if (!b) return;
+    const today = dateKey(new Date());
+    if (filter === 'upcoming' && b.checkin < today) {
+      setFilter('all', document.querySelectorAll('.tab')[2]);
+    } else if (filter === 'past' && b.checkin >= today) {
+      setFilter('all', document.querySelectorAll('.tab')[2]);
+    }
+    // Wait for render then scroll and highlight
+    setTimeout(() => {
+      const el = document.getElementById(`booking-item-${id}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('highlighted');
+      void el.offsetWidth; // force reflow to restart animation
+      el.classList.add('highlighted');
+      setTimeout(() => el.classList.remove('highlighted'), 2600);
+    }, 50);
   }
 
   // ---------------------------------------------------------------------------
@@ -753,9 +789,11 @@
       document.getElementById('checkinDate').value = '';
       document.getElementById('guestEmail').value = '';
       document.getElementById('notes').value = '';
+      if (filter !== 'upcoming') setFilter('upcoming', document.querySelectorAll('.tab')[0]);
       renderCalendar();
       renderBookings();
       showToast('Booking added!');
+      highlightBooking(b.id);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -765,13 +803,15 @@
   }
 
   async function deleteBooking(id) {
-    if (!confirm('Remove this booking?')) return;
+    const b = bookings.find(b => b.id === id);
+    const label = b ? (b.linked_family_name || b.name) : 'this booking';
+    if (!confirm(`Remove booking for ${label}?`)) return;
     try {
       await apiFetch(`/api/bookings/${id}`, { method: 'DELETE' });
       bookings = bookings.filter(b => b.id !== id);
       renderCalendar();
       renderBookings();
-      showToast('Booking removed.');
+      showToast(`Booking for ${label} removed.`);
     } catch (e) {
       alert(e.message);
     }
@@ -856,7 +896,7 @@
         ? `<div class="guest-email">${escapeHtml(effectiveEmail)}${b.family_email && !b.email ? ' <span style="color:#a0aec0;font-size:0.7rem;">(family)</span>' : ''}</div>`
         : '';
       return `
-        <div class="booking-item">
+        <div class="booking-item" id="booking-item-${b.id}">
           <button class="delete-btn" onclick="deleteBooking(${b.id})" title="Remove">&#215;</button>
           <div class="guest-name">${escapeHtml(b.name)}</div>
           <div class="dates">${formatDate(b.checkin)} &rarr; ${formatDate(checkout)}</div>
