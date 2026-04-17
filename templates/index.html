@@ -372,8 +372,30 @@
     .toast.show { opacity: 1; }
 
     @media (max-width: 900px) {
-      .main { grid-template-columns: 1fr; }
+      .main { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
       .calendar-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 700px) {
+      header { min-height: 90px; }
+      .header-content { flex-wrap: wrap; gap: 10px; padding: 14px 16px; }
+      header h1 { font-size: 1.15rem; }
+      header p { font-size: 0.78rem; }
+      .year-nav span { font-size: 0.85rem; min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .year-nav button { width: 28px; height: 28px; font-size: 0.9rem; }
+      .main { padding: 12px; gap: 12px; }
+      .calendar-grid { grid-template-columns: 1fr; gap: 10px; }
+      .month-card { padding: 10px; }
+      .day { font-size: 0.78rem; min-height: 30px; }
+      .day.friday { font-size: 0.78rem; }
+      .card { padding: 14px; }
+      .card h2 { font-size: 0.9rem; }
+      .booking-item .actions { flex-wrap: wrap; }
+      .booking-item .actions select { width: 100%; }
+      #upcomingBanner > div { min-width: 0 !important; }
+      .legend { gap: 8px; font-size: 0.7rem; }
+      .btn { padding: 11px; font-size: 0.9rem; }
+      .form-group input, .form-group textarea, .form-group select { font-size: 1rem; padding: 9px 10px; }
     }
   </style>
 </head>
