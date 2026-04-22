@@ -321,7 +321,10 @@
     <h1>Dixie Summerhouse Condo</h1>
     <p>Family Directory</p>
   </div>
-  <a class="back-link" href="/">&#8592; Bookings</a>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <a class="back-link" href="/">&#8592; Bookings</a>
+    <a class="back-link" href="/logout" style="border-color:rgba(255,255,255,0.3);">Sign Out</a>
+  </div>
 </header>
 
 <div class="main">
@@ -385,6 +388,23 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Set Password Modal -->
+<div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:10px;padding:28px 30px;width:100%;max-width:340px;box-shadow:0 4px 24px rgba(0,0,0,0.18);">
+    <h3 id="pwModalTitle" style="font-size:0.95rem;font-weight:700;color:#2d3748;margin-bottom:16px;"></h3>
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:0.75rem;font-weight:600;color:#4a5568;margin-bottom:5px;">New Password</label>
+      <input id="pwInput" type="password" placeholder="Enter password"
+        style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px;font-size:0.88rem;font-family:inherit;"
+        onkeydown="if(event.key==='Enter')savePassword();" />
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-sm btn-danger" onclick="closePwModal()">Cancel</button>
+      <button id="pwSaveBtn" class="btn btn-sm btn-primary" onclick="savePassword()">Save Password</button>
+    </div>
+  </div>
+</div>
 
 <script>
   let families = [];
@@ -561,6 +581,7 @@
     const actionsHtml = isEditing
       ? `<button class="btn btn-sm btn-danger" onclick="cancelEdit()">Cancel</button>`
       : `<button class="btn btn-sm btn-ghost" onclick="startEdit(${f.id})">Edit</button>
+         <button class="btn btn-sm btn-ghost" onclick="showSetPassword(${f.id})">Set Password</button>
          <button class="btn btn-sm btn-danger" onclick="deleteFamily(${f.id})">Remove</button>`;
 
     let contactsHtml;
@@ -627,6 +648,52 @@
     }
     list.innerHTML = families.map(renderFamilyCard).join('');
   }
+
+  // ---------------------------------------------------------------------------
+  // Set Password
+  // ---------------------------------------------------------------------------
+
+  function showSetPassword(id) {
+    const f = families.find(f => f.id === id);
+    const name = f ? escapeHtml(f.family_name) : '';
+    const modal = document.getElementById('pwModal');
+    document.getElementById('pwModalTitle').textContent = `Set Password — ${f?.family_name || ''}`;
+    document.getElementById('pwInput').value = '';
+    modal.dataset.familyId = id;
+    modal.style.display = 'flex';
+    document.getElementById('pwInput').focus();
+  }
+
+  function closePwModal() {
+    document.getElementById('pwModal').style.display = 'none';
+  }
+
+  async function savePassword() {
+    const modal = document.getElementById('pwModal');
+    const id = parseInt(modal.dataset.familyId);
+    const password = document.getElementById('pwInput').value.trim();
+    if (!password) { alert('Please enter a password.'); return; }
+
+    const btn = document.getElementById('pwSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+      await apiFetch(`/api/families/${id}/password`, {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      });
+      closePwModal();
+      showToast('Password set!');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save Password';
+    }
+  }
+
+  document.getElementById('pwModal').addEventListener('click', function(e) {
+    if (e.target === this) closePwModal();
+  });
 
   // ---------------------------------------------------------------------------
   // Init

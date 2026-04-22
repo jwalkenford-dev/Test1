@@ -51,6 +51,11 @@ def init_db():
                 contact2_phone  TEXT    DEFAULT ''
             )
         ''')
+        try:
+            conn.execute("ALTER TABLE families ADD COLUMN password_hash TEXT DEFAULT ''")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         conn.commit()
 
 
@@ -247,6 +252,22 @@ def delete_family(family_id):
         cur = conn.execute('DELETE FROM families WHERE id = ?', (family_id,))
         conn.commit()
     return cur.rowcount
+
+
+def set_family_password(family_id, password_hash):
+    with get_conn() as conn:
+        conn.execute('UPDATE families SET password_hash = ? WHERE id = ?', (password_hash, family_id))
+        conn.commit()
+
+
+def get_family_by_email(email):
+    """Return the first family where contact1_email or contact2_email matches (case-insensitive)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT * FROM families WHERE LOWER(contact1_email) = LOWER(?) OR LOWER(contact2_email) = LOWER(?)',
+            (email, email)
+        ).fetchone()
+    return row_to_dict(row)
 
 
 def save_guest_response(token, response_text):

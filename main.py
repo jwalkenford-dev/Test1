@@ -1,8 +1,10 @@
 import os
 from datetime import datetime, timedelta
+from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 
@@ -17,6 +19,7 @@ from database import (
     get_booking_by_checkin,
     get_booking_by_id,
     get_booking_by_token,
+    get_family_by_email,
     get_family_by_id,
     get_unreminded_bookings_with_email,
     init_db,
@@ -25,6 +28,7 @@ from database import (
     mark_sms_sent,
     save_guest_response,
     set_booking_family,
+    set_family_password,
     set_gcal_event_id,
     update_booking,
     update_family,
@@ -37,6 +41,56 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 BASE_URL = os.getenv('BASE_URL', 'http://localhost:5000')
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.get('/login')
+def login_page():
+    if session.get('logged_in'):
+        return redirect(url_for('index'))
+    error = request.args.get('error')
+    return render_template('login.html', error=error)
+
+
+@app.post('/login')
+def login_submit():
+    email = (request.form.get('email') or '').strip().lower()
+    password = (request.form.get('password') or '').strip()
+
+    # Admin override via env vars
+    admin_email = (os.getenv('ADMIN_EMAIL') or '').strip().lower()
+    admin_password = os.getenv('ADMIN_PASSWORD') or ''
+    if admin_email and email == admin_email and password == admin_password:
+        session['logged_in'] = True
+        session['user_name'] = 'Admin'
+        return redirect(url_for('index'))
+
+    # Check families table
+    family = get_family_by_email(email)
+    if family and family.get('password_hash') and check_password_hash(family['password_hash'], password):
+        session['logged_in'] = True
+        session['user_name'] = family['family_name']
+        return redirect(url_for('index'))
+
+    return redirect(url_for('login_page', error='Invalid email or password.'))
+
+
+@app.get('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
 
 
 # ---------------------------------------------------------------------------
@@ -76,16 +130,19 @@ def is_friday(date_str):
 # ---------------------------------------------------------------------------
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 
 @app.get('/api/bookings')
+@login_required
 def list_bookings():
     return jsonify(get_all_bookings())
 
 
 @app.post('/api/bookings')
+@login_required
 def create_booking():
     data = request.get_json(force=True)
     name = (data.get('name') or '').strip()
@@ -113,6 +170,7 @@ def create_booking():
 
 
 @app.delete('/api/bookings/<int:booking_id>')
+@login_required
 def remove_booking(booking_id):
     b = get_booking_by_id(booking_id)
     if not b:
@@ -125,6 +183,7 @@ def remove_booking(booking_id):
 
 
 @app.put('/api/bookings/<int:booking_id>/family')
+@login_required
 def link_family(booking_id):
     if not get_booking_by_id(booking_id):
         return jsonify({'error': 'Booking not found.'}), 404
@@ -135,6 +194,7 @@ def link_family(booking_id):
 
 
 @app.post('/api/bookings/import')
+@login_required
 def import_bookings():
     import csv
     import io
@@ -272,6 +332,7 @@ def import_bookings():
 
 
 @app.post('/api/bookings/<int:booking_id>/email')
+@login_required
 def send_manual_email(booking_id):
     b = get_booking_by_id(booking_id)
     if not b:
@@ -304,6 +365,7 @@ def send_manual_email(booking_id):
 
 
 @app.post('/api/bookings/<int:booking_id>/sms')
+@login_required
 def send_manual_sms(booking_id):
     if not sms_sender.is_configured():
         return jsonify({'error': 'Twilio credentials not configured.'}), 503
@@ -376,16 +438,19 @@ def submit_response(token):
 # ---------------------------------------------------------------------------
 
 @app.get('/families')
+@login_required
 def families_page():
     return render_template('families.html')
 
 
 @app.get('/api/families')
+@login_required
 def list_families():
     return jsonify(get_all_families())
 
 
 @app.post('/api/families')
+@login_required
 def create_family():
     data = request.get_json(force=True)
     family_name = (data.get('family_name') or '').strip()
@@ -404,6 +469,7 @@ def create_family():
 
 
 @app.put('/api/families/<int:family_id>')
+@login_required
 def edit_family(family_id):
     if not get_family_by_id(family_id):
         return jsonify({'error': 'Family not found.'}), 404
@@ -425,9 +491,23 @@ def edit_family(family_id):
 
 
 @app.delete('/api/families/<int:family_id>')
+@login_required
 def remove_family(family_id):
     if delete_family(family_id) == 0:
         return jsonify({'error': 'Family not found.'}), 404
+    return jsonify({'ok': True})
+
+
+@app.post('/api/families/<int:family_id>/password')
+@login_required
+def set_password(family_id):
+    if not get_family_by_id(family_id):
+        return jsonify({'error': 'Family not found.'}), 404
+    data = request.get_json(force=True)
+    password = (data.get('password') or '').strip()
+    if not password:
+        return jsonify({'error': 'Password is required.'}), 400
+    set_family_password(family_id, generate_password_hash(password))
     return jsonify({'ok': True})
 
 
@@ -436,6 +516,7 @@ def remove_family(family_id):
 # ---------------------------------------------------------------------------
 
 @app.get('/gcal/connect')
+@login_required
 def gcal_connect():
     from flask import session
     redirect_uri = f"{BASE_URL}/gcal/callback"
@@ -462,6 +543,7 @@ def gcal_callback():
 
 
 @app.get('/api/gcal/status')
+@login_required
 def gcal_status():
     return jsonify({
         'configured': gcal.is_configured(),
@@ -470,6 +552,7 @@ def gcal_status():
 
 
 @app.post('/api/gcal/sync')
+@login_required
 def gcal_sync_all():
     if not gcal.get_service():
         return jsonify({'error': 'Google Calendar not connected.'}), 400
