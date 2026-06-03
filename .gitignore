@@ -7,3 +7,5 @@ bookings.db
 dist/
 build/
 *.egg-info/
+credentials.json
+token.json
