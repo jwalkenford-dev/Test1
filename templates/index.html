@@ -422,6 +422,7 @@
       <p>Friday check-in · Friday checkout · 7-night stays</p>
     </div>
     <div style="display:flex;align-items:center;gap:16px;">
+      <a href="/info" style="color:rgba(255,255,255,0.85);text-decoration:none;font-size:0.83rem;font-weight:500;border:1px solid rgba(255,255,255,0.4);padding:5px 14px;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background=''">Condo Info</a>
       <a href="/families" style="color:rgba(255,255,255,0.85);text-decoration:none;font-size:0.83rem;font-weight:500;border:1px solid rgba(255,255,255,0.4);padding:5px 14px;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background=''">Families</a>
       <a href="/logout" style="color:rgba(255,255,255,0.85);text-decoration:none;font-size:0.83rem;font-weight:500;border:1px solid rgba(255,255,255,0.4);padding:5px 14px;border-radius:6px;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background=''">Sign Out</a>
       <div class="year-nav">
@@ -467,10 +468,17 @@
         <input type="email" id="guestEmail" placeholder="guest@example.com" />
       </div>
       <div class="form-group">
+        <label>Guest Phone (optional)</label>
+        <input type="tel" id="guestPhone" placeholder="e.g. 985-264-1234" />
+      </div>
+      <div class="form-group">
         <label>Notes (optional)</label>
         <textarea id="notes" placeholder="Any notes..."></textarea>
       </div>
-      <button class="btn btn-primary" id="addBtn" onclick="addBooking()">Add Booking</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" id="addBtn" onclick="saveBooking()" style="flex:1;">Add Booking</button>
+        <button class="btn" id="cancelEditBtn" onclick="cancelEdit()" style="display:none;flex:1;background:#e2e8f0;color:#4a5568;">Cancel</button>
+      </div>
     </div>
 
     <div class="card">
@@ -488,15 +496,7 @@
       </ul>
     </div>
 
-    <div class="card" id="gcalCard">
-      <h2>Google Calendar</h2>
-      <div id="gcalStatus" style="font-size:0.82rem;color:#718096;margin-bottom:10px;">Checking…</div>
-      <button class="btn btn-primary" id="gcalConnectBtn" style="display:none" onclick="window.location='/gcal/connect'">Connect Google Calendar</button>
-      <button class="btn btn-primary" id="gcalSyncBtn" style="display:none" onclick="gcalSyncAll()">Sync All to Google Calendar</button>
-      <div id="gcalSyncResult" style="margin-top:8px;font-size:0.78rem;"></div>
-    </div>
-
-    <div class="card">
+<div class="card">
       <h2>Bookings</h2>
       <div class="filter-tabs">
         <div class="tab active" onclick="setFilter('upcoming', this)">Upcoming</div>
@@ -534,6 +534,7 @@
   let filter = 'upcoming';
   let bookings = [];
   let families = [];
+  let editingId = null;
 
   // ---------------------------------------------------------------------------
   // API helpers
@@ -764,11 +765,42 @@
   // CRUD
   // ---------------------------------------------------------------------------
 
-  async function addBooking() {
+  function startEdit(id) {
+    const b = bookings.find(b => b.id === id);
+    if (!b) return;
+    editingId = id;
+    document.getElementById('familyPicker').value = b.family_id || '';
+    document.getElementById('guestName').value = b.name;
+    document.getElementById('checkinDate').value = b.checkin;
+    document.getElementById('guestEmail').value = b.email || '';
+    document.getElementById('guestPhone').value = b.phone || '';
+    document.getElementById('notes').value = b.notes || '';
+    document.getElementById('addBtn').textContent = 'Update Booking';
+    document.getElementById('cancelEditBtn').style.display = 'block';
+    document.querySelector('.card h2').textContent = 'Edit Booking';
+    document.getElementById('guestName').focus();
+    document.querySelector('.card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    document.getElementById('familyPicker').value = '';
+    document.getElementById('guestName').value = '';
+    document.getElementById('checkinDate').value = '';
+    document.getElementById('guestEmail').value = '';
+    document.getElementById('guestPhone').value = '';
+    document.getElementById('notes').value = '';
+    document.getElementById('addBtn').textContent = 'Add Booking';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.querySelector('.card h2').textContent = 'Modify Booking';
+  }
+
+  async function saveBooking() {
     const name = document.getElementById('guestName').value.trim();
     const checkin = document.getElementById('checkinDate').value;
     const notes = document.getElementById('notes').value.trim();
     const email = document.getElementById('guestEmail').value.trim();
+    const phone = document.getElementById('guestPhone').value.trim();
 
     if (!name) { alert('Please enter a guest name.'); return; }
     if (!checkin) { alert('Please select a check-in date.'); return; }
@@ -779,27 +811,39 @@
 
     try {
       const familyId = parseInt(document.getElementById('familyPicker').value, 10) || null;
-      const b = await apiFetch('/api/bookings', {
-        method: 'POST',
-        body: JSON.stringify({ name, checkin, notes, email, family_id: familyId }),
-      });
-      bookings.push(b);
-      bookings.sort((a, c) => a.checkin.localeCompare(c.checkin));
-      document.getElementById('familyPicker').value = '';
-      document.getElementById('guestName').value = '';
-      document.getElementById('checkinDate').value = '';
-      document.getElementById('guestEmail').value = '';
-      document.getElementById('notes').value = '';
-      if (filter !== 'upcoming') setFilter('upcoming', document.querySelectorAll('.tab')[0]);
-      renderCalendar();
-      renderBookings();
-      showToast('Booking added!');
-      highlightBooking(b.id);
+
+      if (editingId) {
+        const updated = await apiFetch(`/api/bookings/${editingId}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, checkin, notes, email, phone, family_id: familyId }),
+        });
+        const idx = bookings.findIndex(b => b.id === editingId);
+        if (idx !== -1) bookings[idx] = { ...bookings[idx], ...updated };
+        bookings.sort((a, c) => a.checkin.localeCompare(c.checkin));
+        cancelEdit();
+        renderCalendar();
+        renderBookings();
+        showToast('Booking updated!');
+        highlightBooking(updated.id);
+      } else {
+        const b = await apiFetch('/api/bookings', {
+          method: 'POST',
+          body: JSON.stringify({ name, checkin, notes, email, phone, family_id: familyId }),
+        });
+        bookings.push(b);
+        bookings.sort((a, c) => a.checkin.localeCompare(c.checkin));
+        cancelEdit();
+        if (filter !== 'upcoming') setFilter('upcoming', document.querySelectorAll('.tab')[0]);
+        renderCalendar();
+        renderBookings();
+        showToast('Booking added!');
+        highlightBooking(b.id);
+      }
     } catch (e) {
       alert(e.message);
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Add Booking';
+      btn.textContent = editingId ? 'Update Booking' : 'Add Booking';
     }
   }
 
@@ -906,6 +950,7 @@
           ${responseBadge}
           <div class="actions" style="margin-top:8px;gap:6px;display:flex;align-items:center;flex-wrap:wrap;">
             ${emailBtn}
+            <button class="email-btn" onclick="startEdit(${b.id})" title="Edit booking">&#9998; Edit</button>
             <select style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:5px;padding:4px 6px;font-size:0.75rem;color:#4a5568;font-family:inherit;"
               onchange="linkFamily(${b.id}, this)">
               <option value="">Link family…</option>

@@ -183,7 +183,10 @@ def get_active_booking_for_date(date_str):
             SELECT b.*,
                    COALESCE(NULLIF(b.phone,''),
                             NULLIF(f.contact1_phone,''),
-                            f.contact2_phone, '') AS effective_phone
+                            f.contact2_phone, '') AS effective_phone,
+                   COALESCE(NULLIF(b.email,''),
+                            NULLIF(f.contact1_email,''),
+                            f.contact2_email, '') AS effective_email
             FROM bookings b
             LEFT JOIN families f ON b.family_id = f.id
             WHERE b.maid_text_sent = 0

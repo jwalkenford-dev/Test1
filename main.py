@@ -34,8 +34,23 @@ from database import (
     update_family,
 )
 import gcal
-from email_sender import send_reminder, send_response_ack
-import sms_sender
+from email_sender import send_reminder, send_response_ack, send_cancellation_notice, send_maid_notice, send_availability_email
+
+
+def broadcast_availability(checkin, checkout, guest_name='', guest_phone=''):
+    """Email all family contact1 emails that the condo is available."""
+    emails = [f['contact1_email'] for f in get_all_families() if f.get('contact1_email')]
+    if emails:
+        try:
+            send_availability_email(
+                emails,
+                checkin.strftime('%B %d, %Y'),
+                checkout.strftime('%B %d, %Y'),
+                guest_name=guest_name,
+                guest_phone=guest_phone,
+            )
+        except Exception as e:
+            print(f"[broadcast] Email failed: {e}")
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
@@ -70,12 +85,15 @@ def login_submit():
     password = (request.form.get('password') or '').strip()
 
     # Admin override via env vars
-    admin_email = (os.getenv('ADMIN_EMAIL') or '').strip().lower()
-    admin_password = os.getenv('ADMIN_PASSWORD') or ''
-    if admin_email and email == admin_email and password == admin_password:
-        session['logged_in'] = True
-        session['user_name'] = 'Admin'
-        return redirect(url_for('index'))
+    admins = [
+        ((os.getenv('ADMIN_EMAIL') or '').strip().lower(), os.getenv('ADMIN_PASSWORD') or ''),
+        ((os.getenv('ADMIN_EMAIL_2') or '').strip().lower(), os.getenv('ADMIN_PASSWORD_2') or ''),
+    ]
+    for admin_email, admin_password in admins:
+        if admin_email and email == admin_email and password == admin_password:
+            session['logged_in'] = True
+            session['user_name'] = 'Admin'
+            return redirect(url_for('index'))
 
     # Check families table
     family = get_family_by_email(email)
@@ -167,6 +185,39 @@ def create_booking():
         set_gcal_event_id(booking['id'], event_id)
         booking['gcal_event_id'] = event_id
     return jsonify(booking), 201
+
+
+@app.put('/api/bookings/<int:booking_id>')
+@login_required
+def edit_booking(booking_id):
+    b = get_booking_by_id(booking_id)
+    if not b:
+        return jsonify({'error': 'Booking not found.'}), 404
+    data = request.get_json(force=True)
+    name = (data.get('name') or '').strip()
+    checkin = (data.get('checkin') or '').strip()
+    notes = (data.get('notes') or '').strip()
+    email = (data.get('email') or '').strip()
+    phone = (data.get('phone') or '').strip()
+
+    if not name:
+        return jsonify({'error': 'Guest name is required.'}), 400
+    if not checkin:
+        return jsonify({'error': 'Check-in date is required.'}), 400
+    if not is_friday(checkin):
+        return jsonify({'error': 'Check-in must be a Friday.'}), 400
+    if has_conflict(checkin, exclude_id=booking_id):
+        return jsonify({'error': 'Week overlaps an existing booking.'}), 409
+
+    updated = update_booking(booking_id, name, checkin, notes, email, phone)
+    if b.get('gcal_event_id'):
+        gcal.update_event(b['gcal_event_id'], name, checkin, notes)
+    elif gcal.get_service():
+        event_id = gcal.create_event(name, checkin, notes)
+        if event_id:
+            set_gcal_event_id(booking_id, event_id)
+            updated['gcal_event_id'] = event_id
+    return jsonify(updated)
 
 
 @app.delete('/api/bookings/<int:booking_id>')
@@ -404,6 +455,40 @@ def respond_page(token):
         return render_template('respond.html', not_found=True)
     checkin = parse_date(b['checkin'])
     checkout = checkin + timedelta(days=7)
+    attending = request.args.get('attending')
+
+    if attending == 'no':
+        guest_name = b['name']
+        guest_email = b.get('email') or ''
+        guest_phone = b.get('phone') or ''
+        if b.get('gcal_event_id'):
+            gcal.delete_event(b['gcal_event_id'])
+        delete_booking(b['id'])
+        if guest_email:
+            try:
+                send_cancellation_notice(
+                    guest_email, guest_name,
+                    checkin.strftime('%B %d, %Y'),
+                    checkout.strftime('%B %d, %Y'),
+                )
+            except Exception:
+                pass
+        broadcast_availability(checkin, checkout, guest_name=guest_name, guest_phone=guest_phone)
+        return render_template('respond.html', not_found=False, cancelled=True, booking_name=guest_name, submitted=False)
+
+    if attending == 'yes':
+        save_guest_response(token, 'Confirmed')
+        mark_reminder_sent(b['id'])
+        return render_template(
+            'respond.html',
+            booking=b,
+            checkin_fmt=checkin.strftime('%B %d, %Y'),
+            checkout_fmt=checkout.strftime('%B %d, %Y'),
+            submitted=True,
+            not_found=False,
+            cancelled=False,
+        )
+
     submitted = request.args.get('submitted') == '1'
     return render_template(
         'respond.html',
@@ -412,6 +497,7 @@ def respond_page(token):
         checkout_fmt=checkout.strftime('%B %d, %Y'),
         submitted=submitted,
         not_found=False,
+        cancelled=False,
     )
 
 
@@ -421,7 +507,30 @@ def submit_response(token):
     if not b:
         return render_template('respond.html', not_found=True)
 
+    attending = request.form.get('attending', 'yes')
     message = (request.form.get('message') or '').strip()
+
+    if attending == 'no':
+        guest_name = b['name']
+        checkin = parse_date(b['checkin'])
+        checkout = checkin + timedelta(days=7)
+        guest_email = b.get('email') or ''
+        guest_phone = b.get('phone') or ''
+        if b.get('gcal_event_id'):
+            gcal.delete_event(b['gcal_event_id'])
+        delete_booking(b['id'])
+        if guest_email:
+            try:
+                send_cancellation_notice(
+                    guest_email, guest_name,
+                    checkin.strftime('%B %d, %Y'),
+                    checkout.strftime('%B %d, %Y'),
+                )
+            except Exception:
+                pass
+        broadcast_availability(checkin, checkout, guest_name=guest_name, guest_phone=guest_phone)
+        return render_template('respond.html', not_found=False, cancelled=True, booking_name=guest_name, submitted=False)
+
     if message:
         save_guest_response(token, message)
         if b['email']:
@@ -436,6 +545,12 @@ def submit_response(token):
 # ---------------------------------------------------------------------------
 # Families
 # ---------------------------------------------------------------------------
+
+@app.get('/info')
+@login_required
+def info_page():
+    return render_template('info.html')
+
 
 @app.get('/families')
 @login_required
@@ -592,13 +707,6 @@ def check_and_send_reminders():
                 except Exception as e:
                     print(f"[reminder] Email failed for booking {b['id']}: {e}")
 
-            if b.get('effective_phone') and not b.get('sms_reminder_sent') and sms_sender.is_configured():
-                try:
-                    sms_sender.send_reminder_sms(b['effective_phone'], b['name'], checkin_fmt, checkout_fmt, respond_url)
-                    mark_sms_sent(b['id'])
-                except Exception as e:
-                    print(f"[reminder] SMS failed for booking {b['id']}: {e}")
-
         except Exception as e:
             print(f"[reminder] Failed for booking {b['id']}: {e}")
 
@@ -612,30 +720,18 @@ def check_and_send_sunday_maid_text():
     b = get_active_booking_for_date(today.strftime('%Y-%m-%d'))
     if not b:
         return
-    phone = b.get('effective_phone', '')
-    if not phone:
-        print(f"[maid-text] No phone for booking {b['id']} — skipping")
-        return
-    if not sms_sender.is_configured():
-        print("[maid-text] Twilio not configured — skipping")
+    email = b.get('effective_email', '')
+    if not email:
+        print(f"[maid-notice] No email for booking {b['id']} — skipping")
         return
     checkout = parse_date(b['checkin']) + timedelta(days=7)
-    checkout_fmt = checkout.strftime('%A, %B %d')
-    body = (
-        f"Hi {b['name']}, a few reminders for checkout:\n\n"
-        f"1. Contact Maid - Mandy {MAID_PHONE} by Monday prior to checkout to let her know what day and time you'll be departing.\n\n"
-        f"2. Ensure sheets and towels are clean and there is no more than 1 load in the washing machine.\n\n"
-        f"3. Ensure there is enough soap, dishwashing detergent, and laundry detergent for at least 2 days use.\n\n"
-        f"Thanks and enjoy your stay!"
-    )
+    checkout_fmt = checkout.strftime('%B %d, %Y')
     try:
-        from twilio.rest import Client
-        client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
-        client.messages.create(body=body, from_=os.getenv('TWILIO_FROM_NUMBER'), to=phone)
+        send_maid_notice(email, b['name'], checkout_fmt, MAID_NAME, MAID_PHONE)
         mark_maid_text_sent(b['id'])
-        print(f"[maid-text] Sent to {b['name']} at {phone}")
+        print(f"[maid-notice] Sent to {b['name']} at {email}")
     except Exception as e:
-        print(f"[maid-text] Failed for booking {b['id']}: {e}")
+        print(f"[maid-notice] Failed for booking {b['id']}: {e}")
 
 
 def start_scheduler():

@@ -86,6 +86,36 @@
     }
     .btn:hover { background: #2c5282; }
 
+    .attend-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .btn-yes {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      background: #276749;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-yes:hover { background: #1e5037; }
+    .btn-no {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 6px;
+      background: #c53030;
+      color: white;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-no:hover { background: #9b2c2c; }
+
     .success-box {
       text-align: center;
       padding: 20px 0;
@@ -93,6 +123,12 @@
     .success-icon { font-size: 2.5rem; }
     .success-box h2 { margin: 12px 0 6px; color: #276749; }
     .success-box p { color: #718096; font-size: 0.88rem; }
+    .cancelled-box {
+      text-align: center;
+      padding: 20px 0;
+    }
+    .cancelled-box h2 { margin: 12px 0 6px; color: #c53030; }
+    .cancelled-box p { color: #718096; font-size: 0.88rem; }
 
     .not-found-box { text-align: center; padding: 20px 0; color: #718096; }
     .not-found-box h2 { color: #2d3748; margin-bottom: 8px; }
@@ -114,11 +150,18 @@
         <p>This confirmation link is no longer valid. If you need help, please contact us directly.</p>
       </div>
 
+    {% elif cancelled %}
+      <div class="cancelled-box">
+        <div class="success-icon">&#10007;</div>
+        <h2>Booking Cancelled</h2>
+        <p>Thank you for letting us know, {{ booking_name }}. Your week has been released and the condo will be made available for others.</p>
+      </div>
+
     {% elif submitted %}
       <div class="success-box">
         <div class="success-icon">&#10003;</div>
         <h2>Thanks, {{ booking.name }}!</h2>
-        <p>We've received your message and will follow up if needed. See you soon!</p>
+        <p>We've received your confirmation and look forward to having you!</p>
       </div>
 
     {% else %}
@@ -142,10 +185,13 @@
       </div>
       {% endif %}
 
-      <div class="section-title">Confirm or send a message</div>
+      <div class="section-title">Will you be using this week?</div>
       <form method="POST">
-        <textarea name="message" placeholder="Type 'Confirmed' to confirm your stay, or ask us anything..."></textarea>
-        <button class="btn" type="submit">Send Response</button>
+        <textarea name="message" placeholder="Optional message..."></textarea>
+        <div class="attend-btns">
+          <button class="btn-yes" type="submit" name="attending" value="yes">Yes, I'll be there</button>
+          <button class="btn-no" type="submit" name="attending" value="no">No, I can't make it</button>
+        </div>
       </form>
     {% endif %}
 
