@@ -366,6 +366,23 @@
       border-color: #2b6cb0;
     }
 
+    .cal-tooltip {
+      position: fixed;
+      background: #2d3748;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      pointer-events: none;
+      z-index: 998;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.15s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .cal-tooltip.visible { opacity: 1; }
+
     .toast {
       position: fixed;
       bottom: 24px;
@@ -526,6 +543,7 @@
   </div>
 </div>
 
+<div class="cal-tooltip" id="calTooltip"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -622,16 +640,34 @@
   // Calendar
   // ---------------------------------------------------------------------------
 
+  const tooltip = document.getElementById('calTooltip');
+
+  function showTooltip(e, text) {
+    tooltip.textContent = text;
+    tooltip.classList.add('visible');
+    moveTooltip(e);
+  }
+
+  function moveTooltip(e) {
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top = (e.clientY - 32) + 'px';
+  }
+
+  function hideTooltip() {
+    tooltip.classList.remove('visible');
+  }
+
   function buildBookedMap() {
     const map = {};
     bookings.forEach(b => {
       const checkin = parseLocalDate(b.checkin);
       const checkout = addDays(checkin, 7);
-      map[dateKey(checkin)] = { type: 'checkin', id: b.id, name: b.name };
+      const label = b.linked_family_name || b.name;
+      map[dateKey(checkin)] = { type: 'checkin', id: b.id, name: b.name, label };
       for (let i = 1; i < 7; i++) {
-        map[dateKey(addDays(checkin, i))] = { type: 'booked', id: b.id, name: b.name };
+        map[dateKey(addDays(checkin, i))] = { type: 'booked', id: b.id, name: b.name, label };
       }
-      map[dateKey(checkout)] = { type: 'checkout', id: b.id, name: b.name };
+      map[dateKey(checkout)] = { type: 'checkout', id: b.id, name: b.name, label };
     });
     return map;
   }
@@ -720,9 +756,11 @@
         const booked = bookedMap[key];
         if (booked) {
           cell.classList.add(booked.type === 'checkin' ? 'checkin' : booked.type === 'checkout' ? 'checkout' : 'booked');
-          cell.title = booked.name;
           cell.style.cursor = 'pointer';
           cell.addEventListener('click', () => highlightBooking(booked.id));
+          cell.addEventListener('mouseenter', e => showTooltip(e, booked.label));
+          cell.addEventListener('mousemove', moveTooltip);
+          cell.addEventListener('mouseleave', hideTooltip);
         } else if (isFriday(date)) {
           cell.classList.add('friday');
           cell.title = 'Click to book this Friday';
