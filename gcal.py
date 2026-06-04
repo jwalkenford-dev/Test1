@@ -1,4 +1,6 @@
 import os
+import json
+import base64
 from datetime import datetime, timedelta
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.events']
@@ -7,7 +9,18 @@ TOKEN_FILE = os.getenv('GCAL_TOKEN_FILE', 'token.json')
 CALENDAR_ID = os.getenv('GCAL_CALENDAR_ID', 'primary')
 
 
+def _ensure_credentials_file():
+    """Write credentials.json from env var if the file doesn't exist."""
+    if not os.path.exists(CREDENTIALS_FILE):
+        encoded = os.getenv('GOOGLE_CREDENTIALS_JSON', '')
+        if encoded:
+            data = base64.b64decode(encoded).decode('utf-8')
+            with open(CREDENTIALS_FILE, 'w') as f:
+                f.write(data)
+
+
 def is_configured():
+    _ensure_credentials_file()
     return os.path.exists(CREDENTIALS_FILE)
 
 
