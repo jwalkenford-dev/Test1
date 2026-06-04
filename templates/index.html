@@ -917,7 +917,8 @@
     const today = dateKey(new Date());
     let filtered = [...bookings];
 
-    if (filter === 'upcoming') filtered = filtered.filter(b => b.checkin >= today);
+    const twelveWeeks = dateKey(addDays(new Date(), 84));
+    if (filter === 'upcoming') filtered = filtered.filter(b => b.checkin >= today && b.checkin <= twelveWeeks);
     else if (filter === 'past') filtered = filtered.filter(b => b.checkin < today);
 
     if (filtered.length === 0) {
