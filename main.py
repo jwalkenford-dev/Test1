@@ -64,7 +64,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 BASE_URL = os.getenv('BASE_URL', 'http://localhost:5000')
 
 UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
-ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 

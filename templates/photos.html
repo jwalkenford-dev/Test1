@@ -170,7 +170,7 @@
       position: relative;
     }
 
-    .photo-card img {
+    .photo-card img, .photo-card video {
       width: 100%;
       height: 180px;
       object-fit: cover;
@@ -178,7 +178,7 @@
       cursor: pointer;
       transition: opacity 0.2s;
     }
-    .photo-card img:hover { opacity: 0.92; }
+    .photo-card img:hover, .photo-card video:hover { opacity: 0.92; }
 
     .photo-info {
       padding: 10px 12px;
@@ -235,7 +235,7 @@
       padding: 20px;
     }
     .lightbox.open { display: flex; }
-    .lightbox img {
+    .lightbox img, .lightbox video {
       max-width: 90vw;
       max-height: 88vh;
       object-fit: contain;
@@ -319,7 +319,7 @@
         <label class="file-label" for="fileInput">
           &#128247; Choose File
         </label>
-        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.gif,.webp" onchange="updateFileLabel(this)" />
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.avi,.webm" onchange="updateFileLabel(this)" />
       </div>
       <button class="btn-primary" id="uploadBtn" onclick="uploadPhoto()">Upload</button>
     </div>
@@ -332,7 +332,8 @@
 
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()">&#215;</button>
-  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" style="display:none;" />
+  <video id="lightboxVideo" src="" controls onclick="event.stopPropagation()" style="display:none;"></video>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -362,22 +363,34 @@
     renderGallery();
   }
 
+  const VIDEO_EXTS = ['mp4', 'mov', 'avi', 'webm'];
+
+  function isVideo(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    return VIDEO_EXTS.includes(ext);
+  }
+
   function renderGallery() {
     const gallery = document.getElementById('gallery');
     if (!photos.length) {
-      gallery.innerHTML = '<div class="no-photos">No photos yet. Be the first to upload one!</div>';
+      gallery.innerHTML = '<div class="no-photos">No photos or videos yet. Be the first to upload one!</div>';
       return;
     }
-    gallery.innerHTML = photos.map(p => `
-      <div class="photo-card" id="photo-${p.id}">
-        <img src="/uploads/${escapeHtml(p.filename)}" alt="${escapeHtml(p.caption)}" onclick="openLightbox('/uploads/${escapeHtml(p.filename)}')" />
-        <button class="delete-btn" onclick="deletePhoto(${p.id})" title="Delete">&#215;</button>
-        <div class="photo-info">
-          ${p.caption ? `<div class="photo-caption">${escapeHtml(p.caption)}</div>` : ''}
-          <div class="photo-meta">${escapeHtml(p.uploader) || 'Unknown'}${p.uploader ? ' · ' : ''}${escapeHtml(p.uploaded_at)}</div>
-        </div>
-      </div>
-    `).join('');
+    gallery.innerHTML = photos.map(p => {
+      const src = `/uploads/${escapeHtml(p.filename)}`;
+      const media = isVideo(p.filename)
+        ? `<video src="${src}" onclick="openLightbox('${src}', true)" muted playsinline></video>`
+        : `<img src="${src}" alt="${escapeHtml(p.caption)}" onclick="openLightbox('${src}', false)" />`;
+      return `
+        <div class="photo-card" id="photo-${p.id}">
+          ${media}
+          <button class="delete-btn" onclick="deletePhoto(${p.id})" title="Delete">&#215;</button>
+          <div class="photo-info">
+            ${p.caption ? `<div class="photo-caption">${escapeHtml(p.caption)}</div>` : ''}
+            <div class="photo-meta">${escapeHtml(p.uploader) || 'Unknown'}${p.uploader ? ' · ' : ''}${escapeHtml(p.uploaded_at)}</div>
+          </div>
+        </div>`;
+    }).join('');
   }
 
   async function uploadPhoto() {
@@ -427,14 +440,28 @@
     }
   }
 
-  function openLightbox(src) {
-    document.getElementById('lightboxImg').src = src;
+  function openLightbox(src, video) {
+    const img = document.getElementById('lightboxImg');
+    const vid = document.getElementById('lightboxVideo');
+    if (video) {
+      img.style.display = 'none';
+      vid.src = src;
+      vid.style.display = 'block';
+    } else {
+      vid.style.display = 'none';
+      vid.src = '';
+      img.src = src;
+      img.style.display = 'block';
+    }
     document.getElementById('lightbox').classList.add('open');
   }
 
   function closeLightbox() {
     document.getElementById('lightbox').classList.remove('open');
     document.getElementById('lightboxImg').src = '';
+    const vid = document.getElementById('lightboxVideo');
+    vid.pause();
+    vid.src = '';
   }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
