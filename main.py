@@ -10,11 +10,14 @@ load_dotenv()
 
 from database import (
     add_booking,
+    add_comment,
     add_family,
     delete_booking,
+    delete_comment,
     delete_family,
     get_active_booking_for_date,
     get_all_bookings,
+    get_all_comments,
     get_all_families,
     get_booking_by_checkin,
     get_booking_by_id,
@@ -100,6 +103,7 @@ def login_submit():
     if family and family.get('password_hash') and check_password_hash(family['password_hash'], password):
         session['logged_in'] = True
         session['user_name'] = family['family_name']
+        session['family_id'] = family['id']
         return redirect(url_for('index'))
 
     return redirect(url_for('login_page', error='Invalid email or password.'))
@@ -109,6 +113,38 @@ def login_submit():
 def logout():
     session.clear()
     return redirect(url_for('login_page'))
+
+
+@app.get('/change-password')
+@login_required
+def change_password_page():
+    return render_template('change_password.html')
+
+
+@app.post('/change-password')
+@login_required
+def change_password_submit():
+    family_id = session.get('family_id')
+    if not family_id:
+        return render_template('change_password.html', error='Password changes are not available for admin accounts.')
+
+    current = (request.form.get('current_password') or '').strip()
+    new_pw = (request.form.get('new_password') or '').strip()
+    confirm = (request.form.get('confirm_password') or '').strip()
+
+    if not current or not new_pw or not confirm:
+        return render_template('change_password.html', error='All fields are required.')
+    if new_pw != confirm:
+        return render_template('change_password.html', error='New passwords do not match.')
+    if len(new_pw) < 6:
+        return render_template('change_password.html', error='New password must be at least 6 characters.')
+
+    family = get_family_by_id(family_id)
+    if not family or not check_password_hash(family['password_hash'], current):
+        return render_template('change_password.html', error='Current password is incorrect.')
+
+    set_family_password(family_id, generate_password_hash(new_pw, method='pbkdf2:sha256'))
+    return render_template('change_password.html', success=True)
 
 
 # ---------------------------------------------------------------------------
@@ -550,6 +586,42 @@ def submit_response(token):
 @login_required
 def info_page():
     return render_template('info.html')
+
+
+@app.get('/comments')
+@login_required
+def comments_page():
+    return render_template('comments.html')
+
+
+@app.get('/api/comments')
+@login_required
+def list_comments():
+    return jsonify(get_all_comments())
+
+
+@app.post('/api/comments')
+@login_required
+def create_comment():
+    data = request.get_json(force=True)
+    author = (data.get('author') or '').strip()
+    comment = (data.get('comment') or '').strip()
+    follow_up = (data.get('follow_up') or '').strip()
+    if not author:
+        return jsonify({'error': 'Name is required.'}), 400
+    if not comment:
+        return jsonify({'error': 'Comment is required.'}), 400
+    created_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    c = add_comment(author, comment, follow_up, created_at)
+    return jsonify(c), 201
+
+
+@app.delete('/api/comments/<int:comment_id>')
+@login_required
+def remove_comment(comment_id):
+    if delete_comment(comment_id) == 0:
+        return jsonify({'error': 'Comment not found.'}), 404
+    return jsonify({'ok': True})
 
 
 @app.get('/families')

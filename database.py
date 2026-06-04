@@ -56,6 +56,15 @@ def init_db():
             conn.commit()
         except sqlite3.OperationalError:
             pass  # Column already exists
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS comments (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                author        TEXT    NOT NULL,
+                comment       TEXT    NOT NULL,
+                follow_up     TEXT    DEFAULT '',
+                created_at    TEXT    NOT NULL
+            )
+        ''')
         conn.commit()
 
 
@@ -271,6 +280,30 @@ def get_family_by_email(email):
             (email, email)
         ).fetchone()
     return row_to_dict(row)
+
+
+def get_all_comments():
+    with get_conn() as conn:
+        rows = conn.execute('SELECT * FROM comments ORDER BY created_at DESC').fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
+def add_comment(author, comment, follow_up, created_at):
+    with get_conn() as conn:
+        cur = conn.execute(
+            'INSERT INTO comments (author, comment, follow_up, created_at) VALUES (?, ?, ?, ?)',
+            (author, comment, follow_up or '', created_at)
+        )
+        conn.commit()
+        row = conn.execute('SELECT * FROM comments WHERE id = ?', (cur.lastrowid,)).fetchone()
+    return row_to_dict(row)
+
+
+def delete_comment(comment_id):
+    with get_conn() as conn:
+        cur = conn.execute('DELETE FROM comments WHERE id = ?', (comment_id,))
+        conn.commit()
+    return cur.rowcount
 
 
 def save_guest_response(token, response_text):

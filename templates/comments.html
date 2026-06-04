@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dixie Summerhouse Condo — Comments</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    header {
+      position: relative;
+      color: white;
+      overflow: hidden;
+      min-height: 120px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .header-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 60%;
+    }
+
+    .header-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, rgba(27,65,120,0.82) 0%, rgba(27,65,120,0.5) 60%, rgba(0,0,0,0.2) 100%);
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 20px 32px;
+    }
+
+    header h1 { font-size: 1.5rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    header p { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+    .header-links { display: flex; align-items: center; gap: 16px; }
+
+    .header-link {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 0.83rem;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.4);
+      padding: 5px 14px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .header-link:hover { background: rgba(255,255,255,0.15); }
+
+    .main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 28px 32px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #2b6cb0;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .form-group { margin-bottom: 14px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+
+    .form-group input, .form-group textarea {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.875rem;
+      color: #2d3748;
+      font-family: inherit;
+    }
+
+    .form-group input:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.15);
+    }
+
+    .form-group textarea { resize: vertical; height: 90px; }
+
+    .btn-primary {
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* Comment items */
+    .comment-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      position: relative;
+      background: white;
+    }
+
+    .comment-item:last-child { margin-bottom: 0; }
+
+    .comment-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 12px;
+    }
+
+    .comment-author {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: #2b6cb0;
+    }
+
+    .comment-date {
+      font-size: 0.75rem;
+      color: #a0aec0;
+      flex-shrink: 0;
+    }
+
+    .comment-text {
+      font-size: 0.875rem;
+      color: #2d3748;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .follow-up-badge {
+      display: inline-flex;
+      align-items: flex-start;
+      gap: 6px;
+      background: #fffbeb;
+      border: 1px solid #f6ad55;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      color: #744210;
+      line-height: 1.5;
+    }
+
+    .follow-up-badge strong { color: #c05621; flex-shrink: 0; }
+
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: #cbd5e0;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px;
+    }
+    .delete-btn:hover { color: #e53e3e; }
+
+    .no-comments {
+      text-align: center;
+      color: #a0aec0;
+      font-size: 0.85rem;
+      padding: 20px 0;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 600px) {
+      .main { padding: 16px; }
+      header { min-height: 90px; }
+      .header-content { flex-wrap: wrap; gap: 10px; padding: 14px 16px; }
+      header h1 { font-size: 1.15rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img class="header-img" src="https://media.scurto.net/cdn-cgi/image/width=1280/2054/media/473954-summer-house-on-romar--1522-0-20248-515.jpg.jpg" alt="Dixie Summerhouse Condo" />
+  <div class="header-overlay"></div>
+  <div class="header-content">
+    <div>
+      <h1>Dixie Summerhouse Condo</h1>
+      <p>Comments &amp; Follow-ups</p>
+    </div>
+    <div class="header-links">
+      <a href="/" class="header-link">Bookings</a>
+      <a href="/info" class="header-link">Condo Info</a>
+      <a href="/families" class="header-link">Families</a>
+      <a href="/logout" class="header-link">Sign Out</a>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Add Comment Form -->
+  <div class="card">
+    <h2>Add Comment</h2>
+    <div class="form-group">
+      <label>Your Name</label>
+      <input type="text" id="authorInput" placeholder="e.g. Jon Walkenford" />
+    </div>
+    <div class="form-group">
+      <label>Comment</label>
+      <textarea id="commentInput" placeholder="Write your comment here..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Follow-up Required (optional)</label>
+      <textarea id="followUpInput" placeholder="Describe any action items or follow-up needed..." style="height:65px;"></textarea>
+    </div>
+    <button class="btn-primary" id="submitBtn" onclick="submitComment()">Post Comment</button>
+  </div>
+
+  <!-- Comments List -->
+  <div id="commentsList"></div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let comments = [];
+
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function loadComments() {
+    comments = await apiFetch('/api/comments');
+    renderComments();
+  }
+
+  function renderComments() {
+    const list = document.getElementById('commentsList');
+    if (!comments.length) {
+      list.innerHTML = '<div class="no-comments">No comments yet.</div>';
+      return;
+    }
+    list.innerHTML = comments.map(c => `
+      <div class="comment-item" id="comment-${c.id}">
+        <button class="delete-btn" onclick="deleteComment(${c.id})" title="Delete">&#215;</button>
+        <div class="comment-header">
+          <span class="comment-author">${escapeHtml(c.author)}</span>
+          <span class="comment-date">${escapeHtml(c.created_at)}</span>
+        </div>
+        <div class="comment-text">${escapeHtml(c.comment).replace(/\n/g, '<br>')}</div>
+        ${c.follow_up ? `
+        <div class="follow-up-badge">
+          <strong>Follow-up:</strong> ${escapeHtml(c.follow_up).replace(/\n/g, '<br>')}
+        </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  async function submitComment() {
+    const author = document.getElementById('authorInput').value.trim();
+    const comment = document.getElementById('commentInput').value.trim();
+    const follow_up = document.getElementById('followUpInput').value.trim();
+
+    if (!author) { alert('Please enter your name.'); return; }
+    if (!comment) { alert('Please enter a comment.'); return; }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Posting…';
+
+    try {
+      const c = await apiFetch('/api/comments', {
+        method: 'POST',
+        body: JSON.stringify({ author, comment, follow_up }),
+      });
+      comments.unshift(c);
+      renderComments();
+      document.getElementById('commentInput').value = '';
+      document.getElementById('followUpInput').value = '';
+      showToast('Comment posted!');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Post Comment';
+    }
+  }
+
+  async function deleteComment(id) {
+    if (!confirm('Delete this comment?')) return;
+    try {
+      await apiFetch(`/api/comments/${id}`, { method: 'DELETE' });
+      comments = comments.filter(c => c.id !== id);
+      renderComments();
+      showToast('Comment deleted.');
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  loadComments();
+</script>
+
+</body>
+</html>
