@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dixie Summerhouse Condo — Photos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      color: #2d3748;
+    }
+
+    header {
+      position: relative;
+      color: white;
+      overflow: hidden;
+      min-height: 120px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .header-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 60%;
+    }
+
+    .header-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to right, rgba(27,65,120,0.82) 0%, rgba(27,65,120,0.5) 60%, rgba(0,0,0,0.2) 100%);
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 20px 32px;
+    }
+
+    header h1 { font-size: 1.5rem; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    header p { font-size: 0.85rem; opacity: 0.9; margin-top: 2px; }
+
+    .header-links { display: flex; align-items: center; gap: 16px; }
+
+    .header-link {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 0.83rem;
+      font-weight: 500;
+      border: 1px solid rgba(255,255,255,0.4);
+      padding: 5px 14px;
+      border-radius: 6px;
+      transition: background 0.2s;
+    }
+    .header-link:hover { background: rgba(255,255,255,0.15); }
+
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 32px;
+    }
+
+    .upload-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 22px;
+      margin-bottom: 24px;
+    }
+
+    .upload-card h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #2b6cb0;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .upload-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .upload-row .form-group { margin: 0; flex: 1; min-width: 160px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 5px;
+    }
+
+    .form-group input[type="text"] {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.875rem;
+      color: #2d3748;
+      font-family: inherit;
+    }
+
+    .form-group input[type="text"]:focus {
+      outline: none;
+      border-color: #2b6cb0;
+      box-shadow: 0 0 0 3px rgba(43,108,176,0.15);
+    }
+
+    .file-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 2px dashed #bee3f8;
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: #2b6cb0;
+      font-weight: 500;
+      background: #ebf4ff;
+      white-space: nowrap;
+    }
+    .file-label:hover { background: #bee3f8; }
+
+    #fileInput { display: none; }
+
+    .btn-primary {
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 20px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #2c5282; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* Gallery */
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .photo-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .photo-card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .photo-card img:hover { opacity: 0.92; }
+
+    .photo-info {
+      padding: 10px 12px;
+    }
+
+    .photo-caption {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 3px;
+    }
+
+    .photo-meta {
+      font-size: 0.75rem;
+      color: #a0aec0;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0,0,0,0.55);
+      border: none;
+      color: white;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .delete-btn:hover { background: #e53e3e; }
+
+    .no-photos {
+      text-align: center;
+      color: #a0aec0;
+      font-size: 0.88rem;
+      padding: 40px 0;
+      grid-column: 1 / -1;
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 88vh;
+      object-fit: contain;
+      border-radius: 6px;
+    }
+    .lightbox-close {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      color: white;
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      background: none;
+      border: none;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 600px) {
+      .main { padding: 16px; }
+      .upload-row { flex-direction: column; }
+      header { min-height: 90px; }
+      .header-content { flex-wrap: wrap; gap: 10px; padding: 14px 16px; }
+      header h1 { font-size: 1.15rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <img class="header-img" src="https://media.scurto.net/cdn-cgi/image/width=1280/2054/media/473954-summer-house-on-romar--1522-0-20248-515.jpg.jpg" alt="Dixie Summerhouse Condo" />
+  <div class="header-overlay"></div>
+  <div class="header-content">
+    <div>
+      <h1>Dixie Summerhouse Condo</h1>
+      <p>Photo Gallery</p>
+    </div>
+    <div class="header-links">
+      <a href="/" class="header-link">Bookings</a>
+      <a href="/info" class="header-link">Condo Info</a>
+      <a href="/comments" class="header-link">Comments</a>
+      <a href="/families" class="header-link">Families</a>
+      <a href="/logout" class="header-link">Sign Out</a>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="upload-card">
+    <h2>Upload Photo</h2>
+    <div class="upload-row">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="uploaderInput" placeholder="e.g. Jon Walkenford" />
+      </div>
+      <div class="form-group">
+        <label>Caption (optional)</label>
+        <input type="text" id="captionInput" placeholder="Describe the photo..." />
+      </div>
+      <div>
+        <label class="form-group" style="display:block;margin-bottom:5px;">
+          <span style="font-size:0.78rem;font-weight:600;color:#4a5568;">Photo</span>
+        </label>
+        <label class="file-label" for="fileInput">
+          &#128247; Choose File
+        </label>
+        <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.gif,.webp" onchange="updateFileLabel(this)" />
+      </div>
+      <button class="btn-primary" id="uploadBtn" onclick="uploadPhoto()">Upload</button>
+    </div>
+    <div id="uploadResult" style="margin-top:10px;font-size:0.8rem;"></div>
+  </div>
+
+  <div class="gallery" id="gallery"></div>
+
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">&#215;</button>
+  <img id="lightboxImg" src="" alt="" onclick="event.stopPropagation()" />
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let photos = [];
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function updateFileLabel(input) {
+    const label = document.querySelector('.file-label');
+    label.textContent = input.files.length ? input.files[0].name : '📷 Choose File';
+  }
+
+  async function loadPhotos() {
+    const res = await fetch('/api/photos');
+    photos = await res.json();
+    renderGallery();
+  }
+
+  function renderGallery() {
+    const gallery = document.getElementById('gallery');
+    if (!photos.length) {
+      gallery.innerHTML = '<div class="no-photos">No photos yet. Be the first to upload one!</div>';
+      return;
+    }
+    gallery.innerHTML = photos.map(p => `
+      <div class="photo-card" id="photo-${p.id}">
+        <img src="/uploads/${escapeHtml(p.filename)}" alt="${escapeHtml(p.caption)}" onclick="openLightbox('/uploads/${escapeHtml(p.filename)}')" />
+        <button class="delete-btn" onclick="deletePhoto(${p.id})" title="Delete">&#215;</button>
+        <div class="photo-info">
+          ${p.caption ? `<div class="photo-caption">${escapeHtml(p.caption)}</div>` : ''}
+          <div class="photo-meta">${escapeHtml(p.uploader) || 'Unknown'}${p.uploader ? ' · ' : ''}${escapeHtml(p.uploaded_at)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function uploadPhoto() {
+    const fileInput = document.getElementById('fileInput');
+    const uploader = document.getElementById('uploaderInput').value.trim();
+    const caption = document.getElementById('captionInput').value.trim();
+    const resultDiv = document.getElementById('uploadResult');
+    const btn = document.getElementById('uploadBtn');
+
+    if (!uploader) { alert('Please enter your name.'); return; }
+    if (!fileInput.files.length) { alert('Please choose a photo.'); return; }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('uploader', uploader);
+    formData.append('caption', caption);
+
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    resultDiv.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/photos', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      photos.unshift(data);
+      renderGallery();
+      fileInput.value = '';
+      document.querySelector('.file-label').textContent = '📷 Choose File';
+      document.getElementById('captionInput').value = '';
+      showToast('Photo uploaded!');
+    } catch (e) {
+      resultDiv.innerHTML = `<span style="color:#e53e3e;">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Upload';
+    }
+  }
+
+  async function deletePhoto(id) {
+    if (!confirm('Delete this photo?')) return;
+    const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      photos = photos.filter(p => p.id !== id);
+      renderGallery();
+      showToast('Photo deleted.');
+    }
+  }
+
+  function openLightbox(src) {
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('open');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('open');
+    document.getElementById('lightboxImg').src = '';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+  loadPhotos();
+</script>
+
+</body>
+</html>

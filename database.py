@@ -65,6 +65,15 @@ def init_db():
                 created_at    TEXT    NOT NULL
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS photos (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename      TEXT    NOT NULL,
+                caption       TEXT    DEFAULT '',
+                uploader      TEXT    DEFAULT '',
+                uploaded_at   TEXT    NOT NULL
+            )
+        ''')
         conn.commit()
 
 
@@ -280,6 +289,32 @@ def get_family_by_email(email):
             (email, email)
         ).fetchone()
     return row_to_dict(row)
+
+
+def get_all_photos():
+    with get_conn() as conn:
+        rows = conn.execute('SELECT * FROM photos ORDER BY uploaded_at DESC').fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
+def add_photo(filename, caption, uploader, uploaded_at):
+    with get_conn() as conn:
+        cur = conn.execute(
+            'INSERT INTO photos (filename, caption, uploader, uploaded_at) VALUES (?, ?, ?, ?)',
+            (filename, caption or '', uploader or '', uploaded_at)
+        )
+        conn.commit()
+        row = conn.execute('SELECT * FROM photos WHERE id = ?', (cur.lastrowid,)).fetchone()
+    return row_to_dict(row)
+
+
+def delete_photo(photo_id):
+    with get_conn() as conn:
+        row = conn.execute('SELECT filename FROM photos WHERE id = ?', (photo_id,)).fetchone()
+        filename = row['filename'] if row else None
+        cur = conn.execute('DELETE FROM photos WHERE id = ?', (photo_id,))
+        conn.commit()
+    return filename, cur.rowcount
 
 
 def get_all_comments():

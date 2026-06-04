@@ -12,13 +12,16 @@ from database import (
     add_booking,
     add_comment,
     add_family,
+    add_photo,
     delete_booking,
     delete_comment,
     delete_family,
+    delete_photo,
     get_active_booking_for_date,
     get_all_bookings,
     get_all_comments,
     get_all_families,
+    get_all_photos,
     get_booking_by_checkin,
     get_booking_by_id,
     get_booking_by_token,
@@ -59,6 +62,14 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 BASE_URL = os.getenv('BASE_URL', 'http://localhost:5000')
+
+UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +597,60 @@ def submit_response(token):
 @login_required
 def info_page():
     return render_template('info.html')
+
+
+@app.get('/photos')
+@login_required
+def photos_page():
+    return render_template('photos.html')
+
+
+@app.get('/api/photos')
+@login_required
+def list_photos():
+    return jsonify(get_all_photos())
+
+
+@app.post('/api/photos')
+@login_required
+def upload_photo():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded.'}), 400
+    f = request.files['file']
+    if not f.filename or not allowed_file(f.filename):
+        return jsonify({'error': 'Invalid file type. Use JPG, PNG, GIF, or WEBP.'}), 400
+
+    import uuid as _uuid
+    ext = f.filename.rsplit('.', 1)[1].lower()
+    filename = f'{_uuid.uuid4().hex}.{ext}'
+    f.save(os.path.join(UPLOAD_FOLDER, filename))
+
+    caption = (request.form.get('caption') or '').strip()
+    uploader = (request.form.get('uploader') or '').strip()
+    uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    photo = add_photo(filename, caption, uploader, uploaded_at)
+    return jsonify(photo), 201
+
+
+@app.get('/uploads/<filename>')
+@login_required
+def serve_upload(filename):
+    from flask import send_from_directory
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.delete('/api/photos/<int:photo_id>')
+@login_required
+def remove_photo(photo_id):
+    filename, rowcount = delete_photo(photo_id)
+    if rowcount == 0:
+        return jsonify({'error': 'Photo not found.'}), 404
+    if filename:
+        try:
+            os.remove(os.path.join(UPLOAD_FOLDER, filename))
+        except OSError:
+            pass
+    return jsonify({'ok': True})
 
 
 @app.get('/comments')
