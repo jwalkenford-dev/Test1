@@ -40,7 +40,7 @@ from database import (
     update_family,
 )
 import gcal
-from email_sender import send_reminder, send_response_ack, send_cancellation_notice, send_maid_notice, send_availability_email
+from email_sender import send_reminder, send_response_ack, send_cancellation_notice, send_maid_notice, send_availability_email, send_comment_notification
 
 
 def broadcast_availability(checkin, checkout, guest_name='', guest_phone=''):
@@ -678,6 +678,14 @@ def create_comment():
         return jsonify({'error': 'Comment is required.'}), 400
     created_at = datetime.now().strftime('%Y-%m-%d %H:%M')
     c = add_comment(author, comment, follow_up, created_at)
+
+    emails = [f['contact1_email'] for f in get_all_families() if f.get('contact1_email')]
+    if emails:
+        try:
+            send_comment_notification(emails, author, comment, follow_up, created_at)
+        except Exception as e:
+            print(f"[comment] Email notification failed: {e}")
+
     return jsonify(c), 201
 
 

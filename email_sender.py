@@ -176,6 +176,32 @@ If you would like to book this week, please contact Jon.
         server.quit()
 
 
+def send_comment_notification(to_addresses, author, comment, follow_up, created_at):
+    subject = f'New Comment from {author} — Dixie Summerhouse Condo'
+    follow_up_line = f'\n\nFollow-up Required:\n{follow_up}' if follow_up else ''
+    body = f"""A new comment has been posted on the Dixie Summerhouse Condo board.
+
+From: {author}
+Date: {created_at}
+
+{comment}{follow_up_line}
+
+View all comments at: https://dixiesummerhouse.com/comments
+
+— Dixie Summerhouse Condo
+"""
+    server, user = _smtp_connection()
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = user
+    msg['To'] = ', '.join(to_addresses)
+    msg.attach(MIMEText(body, 'plain'))
+    try:
+        server.sendmail(user, to_addresses, msg.as_string())
+    finally:
+        server.quit()
+
+
 def send_response_ack(to_address, guest_name):
     subject = 'We received your message — Dixie Summerhouse Condo'
     body = f"""Hi {guest_name},
