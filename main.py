@@ -47,7 +47,7 @@ from database import (
     update_family,
 )
 import gcal
-from email_sender import send_reminder, send_response_ack, send_cancellation_notice, send_maid_notice, send_availability_email, send_comment_notification
+from email_sender import send_reminder, send_response_ack, send_cancellation_notice, send_maid_notice, send_availability_email, send_comment_notification, send_photo_notification
 
 
 def broadcast_availability(checkin, checkout, guest_name='', guest_phone=''):
@@ -636,6 +636,16 @@ def upload_photo():
     uploader = (request.form.get('uploader') or '').strip()
     uploaded_at = now_central().strftime('%Y-%m-%d %H:%M')
     photo = add_photo(filename, caption, uploader, uploaded_at)
+
+    VIDEO_EXTS = {'mp4', 'mov', 'avi', 'webm'}
+    media_type = 'video' if ext in VIDEO_EXTS else 'photo'
+    emails = [f['contact1_email'] for f in get_all_families() if f.get('contact1_email')]
+    if emails:
+        try:
+            send_photo_notification(emails, uploader or 'Someone', caption, media_type, uploaded_at)
+        except Exception as e:
+            print(f"[photo] Email notification failed: {e}")
+
     return jsonify(photo), 201
 
 

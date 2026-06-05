@@ -223,3 +223,28 @@ See you soon!
         server.sendmail(user, to_address, msg.as_string())
     finally:
         server.quit()
+
+
+def send_photo_notification(to_addresses, uploader, caption, media_type, uploaded_at):
+    kind = 'Video' if media_type == 'video' else 'Photo'
+    subject = f'New {kind} Posted — Dixie Summerhouse Condo'
+    caption_line = f'\nCaption: {caption}' if caption else ''
+    body = f"""A new {kind.lower()} has been posted to the Dixie Summerhouse Condo photo gallery.
+
+From: {uploader}
+Date: {uploaded_at}{caption_line}
+
+View it at: https://dixiesummerhouse.com/photos
+
+— Dixie Summerhouse Condo
+"""
+    server, user = _smtp_connection()
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = user
+    msg['To'] = ', '.join(to_addresses)
+    msg.attach(MIMEText(body, 'plain'))
+    try:
+        server.sendmail(user, to_addresses, msg.as_string())
+    finally:
+        server.quit()
