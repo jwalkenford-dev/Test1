@@ -1,6 +1,13 @@
 import os
 from datetime import datetime, timedelta
 from functools import wraps
+from zoneinfo import ZoneInfo
+
+CENTRAL = ZoneInfo('America/Chicago')
+
+
+def now_central():
+    return datetime.now(CENTRAL)
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
@@ -627,7 +634,7 @@ def upload_photo():
 
     caption = (request.form.get('caption') or '').strip()
     uploader = (request.form.get('uploader') or '').strip()
-    uploaded_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    uploaded_at = now_central().strftime('%Y-%m-%d %H:%M')
     photo = add_photo(filename, caption, uploader, uploaded_at)
     return jsonify(photo), 201
 
@@ -676,7 +683,7 @@ def create_comment():
         return jsonify({'error': 'Name is required.'}), 400
     if not comment:
         return jsonify({'error': 'Comment is required.'}), 400
-    created_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    created_at = now_central().strftime('%Y-%m-%d %H:%M')
     c = add_comment(author, comment, follow_up, created_at)
 
     emails = [f['contact1_email'] for f in get_all_families() if f.get('contact1_email')]
@@ -833,7 +840,7 @@ def gcal_sync_all():
 # ---------------------------------------------------------------------------
 
 def check_and_send_reminders():
-    today = datetime.today().date()
+    today = now_central().date()
     target = today + timedelta(days=14)
     for b in get_unreminded_bookings_with_email():
         try:
@@ -861,7 +868,7 @@ MAID_PHONE = '251-243-8068'
 
 
 def check_and_send_sunday_maid_text():
-    today = datetime.today().date()
+    today = now_central().date()
     b = get_active_booking_for_date(today.strftime('%Y-%m-%d'))
     if not b:
         return
@@ -881,7 +888,7 @@ def check_and_send_sunday_maid_text():
 
 def start_scheduler():
     from apscheduler.schedulers.background import BackgroundScheduler
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=CENTRAL)
     scheduler.add_job(check_and_send_reminders, 'cron', hour=8, minute=0)
     scheduler.add_job(check_and_send_sunday_maid_text, 'cron', day_of_week='sun', hour=8, minute=0)
     scheduler.start()
