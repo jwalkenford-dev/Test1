@@ -132,7 +132,7 @@ A few reminders as your checkout approaches:
 
 2. Ensure sheets and towels are clean and there is no more than 1 load in the washing machine.
 
-3. Ensure there is enough soap, dishwashing detergent, and laundry detergent for at least 2 days use.
+3. Ensure there is enough soap, dishwashing detergent, laundry detergent, paper towels, and toilet paper for at least 2 days use.
 
 Checkout: {checkout_str} (Friday)
 
