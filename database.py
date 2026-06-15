@@ -150,24 +150,31 @@ def delete_booking(booking_id):
 
 def get_unreminded_bookings_with_email():
     with get_conn() as conn:
-        rows = conn.execute('''
-            SELECT b.*,
-                   COALESCE(NULLIF(b.email,''),
-                            NULLIF(f.contact1_email,''),
-                            f.contact2_email, '') AS effective_email,
-                   COALESCE(NULLIF(b.phone,''),
-                            NULLIF(f.contact1_phone,''),
-                            f.contact2_phone, '') AS effective_phone
-            FROM bookings b
-            LEFT JOIN families f ON b.family_id = f.id
-            WHERE b.reminder_sent = 0
-              AND (
-                COALESCE(NULLIF(b.email,''), NULLIF(f.contact1_email,''), f.contact2_email, '') != ''
-                OR
-                COALESCE(NULLIF(b.phone,''), NULLIF(f.contact1_phone,''), f.contact2_phone, '') != ''
-              )
-        ''').fetchall()
+        rows = conn.execute('SELECT * FROM bookings WHERE reminder_sent = 0').fetchall()
     return [row_to_dict(r) for r in rows]
+
+
+def get_family_emails_for_booking_name(booking_name):
+    """Return all contact1 emails for families matching the booking name.
+    Handles slash-separated names (e.g. 'Klebba/Dearing') and suffix matches
+    (e.g. 'Prieto' matches 'Lockfield Prieto').
+    """
+    parts = [p.strip() for p in booking_name.split('/')]
+    seen = set()
+    result = []
+    with get_conn() as conn:
+        for part in parts:
+            rows = conn.execute(
+                '''SELECT contact1_email FROM families
+                   WHERE contact1_email != '' AND contact1_email IS NOT NULL
+                   AND (family_name = ? OR family_name LIKE ? OR family_name LIKE ?)''',
+                (part, f'% {part}', f'{part} %')
+            ).fetchall()
+            for r in rows:
+                if r[0] not in seen:
+                    seen.add(r[0])
+                    result.append(r[0])
+    return result
 
 
 def set_gcal_event_id(booking_id, event_id):

@@ -34,6 +34,7 @@ from database import (
     get_booking_by_token,
     get_family_by_email,
     get_family_by_id,
+    get_family_emails_for_booking_name,
     get_unreminded_bookings_with_email,
     init_db,
     mark_maid_text_sent,
@@ -472,14 +473,8 @@ def send_manual_email(booking_id):
     b = get_booking_by_id(booking_id)
     if not b:
         return jsonify({'error': 'Booking not found.'}), 404
-    # Use booking email, or fall back to linked family email
-    from database import get_family_by_id
-    effective_email = b['email']
-    if not effective_email and b.get('family_id'):
-        fam = get_family_by_id(b['family_id'])
-        if fam:
-            effective_email = fam.get('contact1_email') or fam.get('contact2_email') or ''
-    if not effective_email:
+    effective_emails = [b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name'])
+    if not effective_emails:
         return jsonify({'error': 'No email address on this booking.'}), 400
 
     checkin = parse_date(b['checkin'])
@@ -487,14 +482,15 @@ def send_manual_email(booking_id):
     respond_url = f"{BASE_URL}/respond/{b['token']}"
 
     try:
-        send_reminder(
-            effective_email, b['name'],
-            checkin.strftime('%B %d, %Y'),
-            checkout.strftime('%B %d, %Y'),
-            respond_url,
-        )
+        for email in effective_emails:
+            send_reminder(
+                email, b['name'],
+                checkin.strftime('%B %d, %Y'),
+                checkout.strftime('%B %d, %Y'),
+                respond_url,
+            )
         mark_reminder_sent(b['id'])
-        return jsonify({'ok': True, 'email': effective_email})
+        return jsonify({'ok': True, 'emails': effective_emails})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -892,12 +888,15 @@ def check_and_send_reminders():
             checkin_fmt = checkin.strftime('%B %d, %Y')
             checkout_fmt = checkout.strftime('%B %d, %Y')
 
-            if b.get('effective_email') and not b.get('reminder_sent'):
-                try:
-                    send_reminder(b['effective_email'], b['name'], checkin_fmt, checkout_fmt, respond_url)
+            if not b.get('reminder_sent'):
+                emails = [b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name'])
+                for email in emails:
+                    try:
+                        send_reminder(email, b['name'], checkin_fmt, checkout_fmt, respond_url)
+                    except Exception as e:
+                        print(f"[reminder] Email failed for booking {b['id']} to {email}: {e}")
+                if emails:
                     mark_reminder_sent(b['id'])
-                except Exception as e:
-                    print(f"[reminder] Email failed for booking {b['id']}: {e}")
 
         except Exception as e:
             print(f"[reminder] Failed for booking {b['id']}: {e}")
