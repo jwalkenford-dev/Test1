@@ -846,6 +846,27 @@ def gcal_sync_all():
 # Scheduler
 # ---------------------------------------------------------------------------
 
+@app.get('/api/diag/test-reminder/<int:booking_id>')
+@login_required
+def test_reminder(booking_id):
+    b = get_booking_by_id(booking_id)
+    if not b:
+        return jsonify({'error': 'Booking not found'}), 404
+    checkin = parse_date(b['checkin'])
+    checkout = checkin + timedelta(days=7)
+    respond_url = f"{BASE_URL}/respond/{b['token']}"
+    emails = [b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name'])
+    if not emails:
+        return jsonify({'error': 'No emails found for this booking'}), 400
+    errors = []
+    for email in emails:
+        try:
+            send_reminder(email, b['name'], checkin.strftime('%B %d, %Y'), checkout.strftime('%B %d, %Y'), respond_url)
+        except Exception as e:
+            errors.append({'email': email, 'error': str(e)})
+    return jsonify({'booking': b['name'], 'checkin': b['checkin'], 'emails_sent': emails, 'errors': errors})
+
+
 def check_and_send_reminders():
     today = now_central().date()
     target = today + timedelta(days=14)
