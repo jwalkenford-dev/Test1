@@ -160,7 +160,7 @@ def get_unreminded_bookings_with_email():
                             f.contact2_phone, '') AS effective_phone
             FROM bookings b
             LEFT JOIN families f ON b.family_id = f.id
-            WHERE (b.reminder_sent = 0 OR b.sms_reminder_sent = 0)
+            WHERE b.reminder_sent = 0
               AND (
                 COALESCE(NULLIF(b.email,''), NULLIF(f.contact1_email,''), f.contact2_email, '') != ''
                 OR
