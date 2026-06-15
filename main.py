@@ -207,6 +207,18 @@ def index():
     return render_template('index.html')
 
 
+@app.get('/api/diag/families')
+@login_required
+def diag_families():
+    import sqlite3 as _sq
+    db = os.getenv('DB_PATH', 'bookings.db')
+    con = _sq.connect(db)
+    con.row_factory = _sq.Row
+    rows = con.execute('SELECT id, family_name, contact1_email, contact2_email FROM families ORDER BY family_name').fetchall()
+    con.close()
+    return jsonify([dict(r) for r in rows])
+
+
 @app.get('/api/diag/family-links')
 @login_required
 def diag_family_links():
