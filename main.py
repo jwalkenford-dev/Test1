@@ -855,7 +855,8 @@ def test_reminder(booking_id):
     checkin = parse_date(b['checkin'])
     checkout = checkin + timedelta(days=7)
     respond_url = f"{BASE_URL}/respond/{b['token']}"
-    emails = [b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name'])
+    override = request.args.get('email')
+    emails = [override] if override else ([b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name']))
     if not emails:
         return jsonify({'error': 'No emails found for this booking'}), 400
     errors = []
