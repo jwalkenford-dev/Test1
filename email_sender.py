@@ -1,4 +1,5 @@
 import smtplib
+import socket
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -7,8 +8,16 @@ from email.mime.text import MIMEText
 def _smtp_connection():
     user = os.getenv('GMAIL_USER', '')
     password = os.getenv('GMAIL_APP_PASSWORD', '').replace(' ', '')
-    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-    server.login(user, password)
+    # Force IPv4 to avoid "Network is unreachable" on Railway (IPv6 not routed)
+    orig = socket.getaddrinfo
+    def _ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+        return orig(host, port, socket.AF_INET, type, proto, flags)
+    socket.getaddrinfo = _ipv4_only
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(user, password)
+    finally:
+        socket.getaddrinfo = orig
     return server, user
 
 
