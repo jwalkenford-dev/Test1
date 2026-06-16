@@ -1,31 +1,24 @@
-import smtplib
-import socket
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import resend
+
+FROM_ADDRESS = 'Dixie Summerhouse Condo <dixiesummerhouse@dixiesummerhouse.com>'
 
 
-def _smtp_connection():
-    user = os.getenv('GMAIL_USER', '')
-    password = os.getenv('GMAIL_APP_PASSWORD', '').replace(' ', '')
-    # Force IPv4 to avoid "Network is unreachable" on Railway (IPv6 not routed)
-    orig = socket.getaddrinfo
-    def _ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
-        return orig(host, port, socket.AF_INET, type, proto, flags)
-    socket.getaddrinfo = _ipv4_only
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
-        server.ehlo()
-        server.starttls()
-        server.login(user, password)
-    finally:
-        socket.getaddrinfo = orig
-    return server, user
+def _send(to, subject, text, html=None):
+    resend.api_key = os.getenv('RESEND_API_KEY', '')
+    params = {
+        'from': FROM_ADDRESS,
+        'to': to if isinstance(to, list) else [to],
+        'subject': subject,
+        'text': text,
+    }
+    if html:
+        params['html'] = html
+    resend.Emails.send(params)
 
 
 def send_reminder(to_address, guest_name, checkin_str, checkout_str, respond_url):
     subject = 'Reminder: Your Upcoming Stay at Dixie Summerhouse Condo'
-
     yes_url = respond_url + '?attending=yes'
     no_url = respond_url + '?attending=no'
 
@@ -94,18 +87,7 @@ We look forward to having you!
 </body>
 </html>"""
 
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['To'] = to_address
-    msg.attach(MIMEText(plain, 'plain'))
-    msg.attach(MIMEText(html, 'html'))
-
-    server, user = _smtp_connection()
-    msg['From'] = user
-    try:
-        server.sendmail(user, to_address, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_address, subject, plain, html)
 
 
 def send_cancellation_notice(to_address, guest_name, checkin_str, checkout_str):
@@ -118,17 +100,7 @@ If your plans change or you need anything, feel free to reach out.
 
 — Dixie Summerhouse Condo
 """
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['To'] = to_address
-    msg.attach(MIMEText(body, 'plain'))
-
-    server, user = _smtp_connection()
-    msg['From'] = user
-    try:
-        server.sendmail(user, to_address, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_address, subject, body)
 
 
 def send_maid_notice(to_address, guest_name, checkout_str, maid_name, maid_phone):
@@ -149,17 +121,7 @@ Thanks and enjoy your stay!
 
 — Dixie Summerhouse Condo
 """
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['To'] = to_address
-    msg.attach(MIMEText(body, 'plain'))
-
-    server, user = _smtp_connection()
-    msg['From'] = user
-    try:
-        server.sendmail(user, to_address, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_address, subject, body)
 
 
 def send_availability_email(to_addresses, checkin_str, checkout_str, guest_name='', guest_phone=''):
@@ -173,16 +135,7 @@ If you would like to book this week, please contact Jon.
 
 — Dixie Summerhouse Condo
 """
-    server, user = _smtp_connection()
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From'] = user
-    msg['To'] = ', '.join(to_addresses)
-    msg.attach(MIMEText(body, 'plain'))
-    try:
-        server.sendmail(user, to_addresses, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_addresses, subject, body)
 
 
 def send_comment_notification(to_addresses, author, comment, follow_up, created_at):
@@ -199,16 +152,7 @@ View all comments at: https://dixiesummerhouse.com/comments
 
 — Dixie Summerhouse Condo
 """
-    server, user = _smtp_connection()
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From'] = user
-    msg['To'] = ', '.join(to_addresses)
-    msg.attach(MIMEText(body, 'plain'))
-    try:
-        server.sendmail(user, to_addresses, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_addresses, subject, body)
 
 
 def send_response_ack(to_address, guest_name):
@@ -221,17 +165,7 @@ See you soon!
 
 — Dixie Summerhouse Condo
 """
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['To'] = to_address
-    msg.attach(MIMEText(body, 'plain'))
-
-    server, user = _smtp_connection()
-    msg['From'] = user
-    try:
-        server.sendmail(user, to_address, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_address, subject, body)
 
 
 def send_photo_notification(to_addresses, uploader, caption, media_type, uploaded_at):
@@ -247,13 +181,4 @@ View it at: https://dixiesummerhouse.com/photos
 
 — Dixie Summerhouse Condo
 """
-    server, user = _smtp_connection()
-    msg = MIMEMultipart()
-    msg['Subject'] = subject
-    msg['From'] = user
-    msg['To'] = ', '.join(to_addresses)
-    msg.attach(MIMEText(body, 'plain'))
-    try:
-        server.sendmail(user, to_addresses, msg.as_string())
-    finally:
-        server.quit()
+    _send(to_addresses, subject, body)
