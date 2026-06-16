@@ -7,9 +7,7 @@ from email.mime.text import MIMEText
 def _smtp_connection():
     user = os.getenv('GMAIL_USER', '')
     password = os.getenv('GMAIL_APP_PASSWORD', '').replace(' ', '')
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.ehlo()
-    server.starttls()
+    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     server.login(user, password)
     return server, user
 
