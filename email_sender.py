@@ -14,7 +14,9 @@ def _smtp_connection():
         return orig(host, port, socket.AF_INET, type, proto, flags)
     socket.getaddrinfo = _ipv4_only
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=30)
+        server.ehlo()
+        server.starttls()
         server.login(user, password)
     finally:
         socket.getaddrinfo = orig
