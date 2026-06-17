@@ -204,18 +204,9 @@ def mark_maid_text_sent(booking_id):
 def get_active_booking_for_date(date_str):
     """Return the booking whose week covers the given date (checkin <= date < checkin+7)."""
     with get_conn() as conn:
-        rows = conn.execute('''
-            SELECT b.*,
-                   COALESCE(NULLIF(b.phone,''),
-                            NULLIF(f.contact1_phone,''),
-                            f.contact2_phone, '') AS effective_phone,
-                   COALESCE(NULLIF(b.email,''),
-                            NULLIF(f.contact1_email,''),
-                            f.contact2_email, '') AS effective_email
-            FROM bookings b
-            LEFT JOIN families f ON b.family_id = f.id
-            WHERE b.maid_text_sent = 0
-        ''').fetchall()
+        rows = conn.execute(
+            'SELECT * FROM bookings WHERE maid_text_sent = 0'
+        ).fetchall()
     for row in rows:
         d = row_to_dict(row)
         checkin = d['checkin']
