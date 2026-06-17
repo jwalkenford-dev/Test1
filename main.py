@@ -850,6 +850,20 @@ def gcal_sync_all():
 
 
 
+@app.get('/api/diag/test-availability')
+@login_required
+def test_availability():
+    override = request.args.get('email')
+    emails = [override] if override else [f['contact1_email'] for f in get_all_families() if f.get('contact1_email')]
+    if not emails:
+        return jsonify({'error': 'No emails found'}), 400
+    try:
+        send_availability_email(emails, 'June 26, 2026', 'July 03, 2026', guest_name='Walkenford')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'ok': True, 'emails_sent': emails})
+
+
 def check_and_send_reminders():
     today = now_central().date()
     target = today + timedelta(days=14)
