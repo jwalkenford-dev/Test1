@@ -880,26 +880,6 @@ MAID_NAME = 'Mandy Giles'
 MAID_PHONE = '251-243-8068'
 
 
-@app.get('/api/diag/test-maid-notice/<int:booking_id>')
-@login_required
-def test_maid_notice(booking_id):
-    b = get_booking_by_id(booking_id)
-    if not b:
-        return jsonify({'error': 'Booking not found'}), 404
-    override = request.args.get('email')
-    emails = [override] if override else ([b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name']))
-    if not emails:
-        return jsonify({'error': 'No emails found'}), 400
-    checkout = parse_date(b['checkin']) + timedelta(days=7)
-    checkout_fmt = checkout.strftime('%B %d, %Y')
-    errors = []
-    for email in emails:
-        try:
-            send_maid_notice(email, b['name'], checkout_fmt, MAID_NAME, MAID_PHONE)
-        except Exception as e:
-            errors.append({'email': email, 'error': str(e)})
-    return jsonify({'booking': b['name'], 'checkout': checkout_fmt, 'emails_sent': emails, 'errors': errors})
-
 
 def check_and_send_sunday_maid_text():
     today = now_central().date()
