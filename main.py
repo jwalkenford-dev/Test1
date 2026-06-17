@@ -584,9 +584,10 @@ def submit_response(token):
 
     if message:
         save_guest_response(token, message)
-        if b['email']:
+        ack_emails = [b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name'])
+        for ack_email in ack_emails:
             try:
-                send_response_ack(b['email'], b['name'])
+                send_response_ack(ack_email, b['name'])
             except Exception:
                 pass
 
@@ -849,6 +850,25 @@ def gcal_sync_all():
 
 
 
+
+
+@app.get('/api/diag/test-response-ack/<int:booking_id>')
+@login_required
+def test_response_ack(booking_id):
+    b = get_booking_by_id(booking_id)
+    if not b:
+        return jsonify({'error': 'Booking not found'}), 404
+    override = request.args.get('email')
+    emails = [override] if override else ([b['email']] if b.get('email') else get_family_emails_for_booking_name(b['name']))
+    if not emails:
+        return jsonify({'error': 'No emails found'}), 400
+    errors = []
+    for email in emails:
+        try:
+            send_response_ack(email, b['name'])
+        except Exception as e:
+            errors.append({'email': email, 'error': str(e)})
+    return jsonify({'ok': True, 'emails_sent': emails, 'errors': errors})
 
 
 def check_and_send_reminders():
