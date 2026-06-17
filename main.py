@@ -849,26 +849,6 @@ def gcal_sync_all():
 
 
 
-@app.get('/api/diag/test-cancellation/<int:booking_id>')
-@login_required
-def test_cancellation(booking_id):
-    b = get_booking_by_id(booking_id)
-    if not b:
-        return jsonify({'error': 'Booking not found'}), 404
-    override = request.args.get('email')
-    email = override or b.get('email') or get_family_emails_for_booking_name(b['name'])[0:1]
-    if isinstance(email, list):
-        email = email[0] if email else None
-    if not email:
-        return jsonify({'error': 'No email found'}), 400
-    checkin = parse_date(b['checkin'])
-    checkout = checkin + timedelta(days=7)
-    try:
-        send_cancellation_notice(email, b['name'], checkin.strftime('%B %d, %Y'), checkout.strftime('%B %d, %Y'))
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    return jsonify({'ok': True, 'email_sent': email, 'booking': b['name']})
-
 
 def check_and_send_reminders():
     today = now_central().date()
